@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>内容工作台 · 评论与复盘</title>
+<link rel="stylesheet" href="/assets/app.css?v=20261004-discard1" />
+<style>
+  .steps { display:grid; grid-template-columns:repeat(4,1fr); gap:0; margin:12px 0 18px; }
+  .steps > div { padding:10px 12px; border:1px solid var(--line); border-right:0; font-size:12px; }
+  .steps > div:last-child { border-right:1px solid var(--line); }
+  .steps .lvl { font-size:11px; color:var(--muted); }
+  .steps .on { background:color-mix(in srgb,var(--accent) 10%,var(--panel)); }
+  .steps .off { opacity:.5; }
+  /* 例证块：原文必须视觉上就是"原文"，不能被当成系统生成的句子 */
+  .ex { border-left:2px solid var(--line); padding:5px 0 5px 11px; margin:7px 0; }
+  .ex .txt { font-size:12.5px; }
+  .ex .meta { font-size:11px; color:var(--muted); margin-top:2px; }
+  .catblk { padding:12px 14px; border-bottom:1px solid var(--line); }
+  .catblk:last-child { border-bottom:0; }
+  .catblk .hd { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; }
+  .catblk .nm { font-weight:600; font-size:13.5px; }
+  .catblk .frac { font-size:11.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .bar { height:5px; background:var(--bg); border-radius:3px; margin:7px 0 3px; overflow:hidden; }
+  .bar > i { display:block; height:100%; background:var(--accent); }
+  select, textarea, input { padding:6px 9px; border:1px solid var(--line); border-radius:7px;
+    background:var(--panel); color:var(--text); font:inherit; font-size:12.5px; }
+  .obs-caveat { color:var(--warn); font-size:11.5px; }
+</style>
+<link rel="stylesheet" href="/assets/workbench.css?v=20261005"></head>
+<body>
+<nav class="nav" id="nav"></nav>
+
+<div class="wrap">
+  <h1>评论与复盘</h1>
+  <div class="sub">P4 · 分类是规则，不是模型；复盘先说数据够不够，再说看到了什么。</div>
+
+  <div id="status"></div>
+
+  <div class="banner warn">
+    <strong>分类可能出错，所以每组都必须带原文例证。</strong>
+    分类由可读的关键词规则产生（<code>generation_mode = "rule_based"</code>），<b>不是模型推断</b> ——
+    每条都给原文与判断理由，你可以直接核对并纠正。
+    比例数字的<b>分母是本次导入的样本量，不是全部评论数</b>。
+  </div>
+
+  <h2>选择要看的发布</h2>
+  <div class="actions">
+    <select id="sel-pub" style="min-width:360px"><option value="">— 选择发布记录 —</option></select>
+    <select id="sel-content" style="min-width:260px"><option value="">— 选择内容（生成复盘用）—</option></select>
+    <button id="btn-refresh">刷新</button>
+  </div>
+
+  <h2>评论分布</h2>
+  <div class="hint" id="cluster-head">还没有选发布记录。</div>
+  <div class="panel" id="cats"><div class="empty">先在上面选一条发布记录。</div></div>
+  <div class="panel" style="padding:13px 15px;margin-top:12px" id="caveats"></div>
+
+  <h2>复盘：先看数据够不够</h2>
+  <div class="hint"><b>「没有数据」和「数据不好」是两件事</b>，前者不能推出后者。分四级，级别决定了能说什么。</div>
+  <div class="steps" id="steps"></div>
+
+  <h2>复盘报告</h2>
+  <div class="actions">
+    <button class="primary" id="btn-gen">生成复盘（新增版本）</button>
+    <span class="hint" style="margin:0">
+      报告只引用生成那一刻的<b>固定输入快照</b>；之后新增数据只产生新版本，旧报告不被改动。
+    </span>
+  </div>
+  <div id="reports"><div class="empty">还没有复盘报告。</div></div>
+
+  <h2>已登记的建议（来自复盘草稿）</h2>
+  <div class="hint">这里只列候选草稿，<b>全部需要人工确认</b>后才会登记为建议。</div>
+  <div id="drafts"><div class="empty">生成复盘后会在这里看到候选草稿。</div></div>
+
+  <h2>操作日志</h2>
+  <div class="log" id="log"></div>
+</div>
+
+<script type="module">
+import { api, navBar, statusBar, toast, log, guard, esc, stateChip, modeChip } from "/assets/app.js?v=20261005";
+
+document.getElementById("nav").innerHTML = navBar("ReviewInsights");
+
+const LEVELS = ["none", "insufficient", "baseline_only", "comparable"];
+const LEVEL_DESC = {
+  none: ["无发布", "没有效果可复盘"],
+  insufficient: ["有发布无数据", "无数据不等于表现差"],
+  baseline_only: ["单点数据", "无法构成趋势"],
+  comparable: ["多窗口可比", "可比较，仍需同口径"],
+};
+const KIND_LABEL = { meta: "元信息", metric: "指标", comment_distribution: "评论分布" };
+const CAT_COLOR = { question: "acc", challenge: "warn", experience: "ok",
+                    request: "acc", invalid: "", uncategorized: "" };
+
+let PUBLICATIONS = [];
+let CURRENT = null;
+let REPORTS = [];
+
+function renderLevels(cur) {
+  document.getElementById("steps").innerHTML = LEVELS.map(l => {
+    const [name, desc] = LEVEL_DESC[l];
+    return `<div class="${l === cur ? "on" : "off"}">
+      <div class="lvl">${esc(l)}</div><b>${esc(name)}</b>
+      <div style="color:var(--muted);margin-top:3px">${esc(desc)}</div></div>`;
+  }).join("");
+}
+
+function renderCluster(c) {
+  if (!c) {
+    document.getElementById("cats").innerHTML = '<div class="empty">先在上面选一条发布记录。</div>';
+    document.getElementById("caveats").innerHTML = "";
+    document.getElementById("cluster-head").textContent = "还没有选发布记录。";
+    return;
+  }
+  document.getElementById("cluster-head").innerHTML =
+    `取样口径：${(c.sampling_methods || []).map(m => `<code>${esc(m)}</code>`).join(" ") || '<span class="missing">未记录</span>'}
+     · 样本量 <b>${c.total_comments ?? 0}</b>
+     · 平台 ${(c.platforms || []).map(esc).join(" ")}
+     · 分类方式 <code>${esc(c.generation_mode || "")}</code>`;
+
+  const groups = c.groups || [];
+  document.getElementById("cats").innerHTML = groups.length ? groups.map(g => {
+    const pct = ((g.share ?? 0) * 100).toFixed(1);
+    return `<div class="catblk">
+      <div class="hd">
+        <span class="nm">${esc(g.label)}</span>
+        <span class="chip ${CAT_COLOR[g.category] || ""}">${esc(g.category)}</span>
+        <span class="frac">${g.count} / ${g.of_total} = ${pct}%</span>
+      </div>
+      <div class="bar"><i style="width:${Math.min(100, pct)}%"></i></div>
+      <div class="hint" style="margin:0">判断依据：${esc(g.category_reason || g.reason || "")}</div>
+      ${(g.examples || []).map(e => `
+        <div class="ex">
+          <div class="txt">「${esc(e.text)}」</div>
+          <div class="meta">赞 ${e.like_count ?? 0}
+            ${e.category_reason ? ` · ${esc(e.category_reason)}` : ""}
+            ${e.observed_at ? ` · ${esc(e.observed_at)}` : ""}</div>
+        </div>`).join("")}
+      ${g.examples_truncated ? '<div class="hint" style="margin:4px 0 0">（原文例证已截断）</div>' : ""}
+    </div>`;
+  }).join("") : '<div class="empty">这条发布没有评论样本。</div>';
+
+  document.getElementById("caveats").innerHTML = `
+    <div style="font-size:12.5px"><b>取样偏差说明</b></div>
+    <div class="hint" style="margin:5px 0 0">${esc(c.sampling_bias_note || "")}</div>
+    ${(c.caveats || []).map(x => `<div class="hint" style="margin:3px 0 0">· ${esc(x)}</div>`).join("")}
+    <div class="hint" style="margin:5px 0 0">${esc(c.generation_note || "")}</div>`;
+}
+
+function renderReports(items) {
+  if (!items.length) {
+    document.getElementById("reports").innerHTML = '<div class="empty">还没有复盘报告。点上面「生成复盘」。</div>';
+    return;
+  }
+  document.getElementById("reports").innerHTML = items.map(r => `
+    <div class="panel" style="padding:14px 16px;margin-bottom:12px">
+      <div class="hd" style="display:flex;gap:9px;flex-wrap:wrap;align-items:baseline">
+        <b>报告 v${r.version}</b>
+        ${stateChip(r.data_sufficiency)}
+        <span class="chip">${esc(r.generation_mode || "")}</span>
+        ${r.run_mode ? modeChip(r.run_mode) : ""}
+        <span class="hint" style="margin:0">${esc(r.created_at || "")}</span>
+      </div>
+      <div class="banner ${r.data_sufficiency === "comparable" ? "ok" : "warn"}" style="margin:10px 0">
+        <strong>数据充足度：${esc(r.data_sufficiency)}</strong>
+        <div class="hint" style="margin:5px 0 0">${esc(r.sufficiency_note || "")}</div>
+      </div>
+      <div class="hint" style="margin:0 0 8px">
+        输入快照：${r.snapshot_count ?? 0} 条指标快照 · ${r.comment_count ?? 0} 条评论 ·
+        发布 ${(r.inputs?.publication_ids || []).length} 条 · 共 ${r.inputs?.snapshot_ids?.length ?? 0} 个引用 id
+      </div>
+      ${(r.limitations || []).length ? `<div style="font-size:12.5px"><b>限制</b>（会一直挂在结论旁边）：
+        <ul style="margin:5px 0 0;padding-left:20px;color:var(--muted);font-size:12px">${
+          r.limitations.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
+      <h3>观察：只陈述，不解释</h3>
+      <div class="hint">程序生成的观察<b>不含「因为 / 导致 / 所以 / 说明了」</b>。要解释就必须走假设那条路。</div>
+      <table>
+        <thead><tr><th style="width:12%">类型</th><th style="width:40%">陈述</th>
+          <th style="width:14%">值</th><th>口径与证据</th></tr></thead>
+        <tbody>${(r.observations || []).map(o => `
+          <tr>
+            <td><span class="chip">${esc(KIND_LABEL[o.kind] || o.kind || "")}</span></td>
+            <td>${esc(o.statement || "")}</td>
+            <td>${o.value === null || o.value === undefined
+              ? '<span class="missing">缺失</span>'
+              : `${esc(String(o.value))} ${esc(o.unit || "")}`}</td>
+            <td>
+              ${o.at_age_hours !== null && o.at_age_hours !== undefined
+                ? `${o.at_age_hours}h · ` : ""}${esc(o.window_kind || "")}
+              ${o.traffic_type ? ` · ${esc(o.traffic_type)}` : ""}
+              ${o.caveat ? `<div class="obs-caveat">${esc(o.caveat)}</div>` : ""}
+            </td>
+          </tr>`).join("") || '<tr><td colspan="4" class="empty">无观察</td></tr>'}
+        </tbody>
+      </table>
+      ${(r.hypotheses || []).length ? `<h3>假设</h3>${r.hypotheses.map(h => `
+        <div class="panel" style="padding:11px 13px;margin-bottom:8px">
+          <div style="font-weight:600;font-size:13px">${esc(h.statement || h.text || "")}</div>
+          <div class="hint" style="margin:3px 0 6px">置信度 ${esc(h.confidence || "low")}
+            · 来源 ${esc(h.source || r.generation_mode)}</div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:5px">替代解释（用于证伪）</div>
+          ${(h.alternative_explanations || []).map(a =>
+            `<div class="ex"><div class="txt">${esc(a)}</div></div>`).join("")
+            || '<div class="obs-caveat">未给出替代解释 —— 未通过接口校验的假设不会出现在这里。</div>'}
+        </div>`).join("")}` : ""}
+      ${(r.next_topics || []).length ? `<h3>候选选题</h3>
+        <div class="hint">${r.next_topics.map(t => `<code>${esc(t)}</code>`).join(" ")}</div>` : ""}
+      <h3>来源链</h3>
+      <div class="hint">逐层列出这份报告实际用到了什么。<b>没用到的层不会出现</b>。</div>
+      <table>
+        <thead><tr><th style="width:22%">层</th><th style="width:30%">id</th><th>说明</th></tr></thead>
+        <tbody>${(r.source_chain || []).map(s => `<tr>
+          <td><code>${esc(s.level)}</code></td>
+          <td><code>${esc((s.id || "").slice(0, 12))}</code></td>
+          <td style="color:var(--muted)">${esc(s.platform || s.note || s.observed_at || "")}</td>
+        </tr>`).join("") || '<tr><td colspan="3" class="empty">无</td></tr>'}</tbody>
+      </table>
+      ${r.structure_note ? `<div class="hint" style="margin-top:9px">${
+        typeof r.structure_note === 'object'
+          ? Object.values(r.structure_note).map(x => esc(x)).join('<br>')
+          : esc(r.structure_note)}</div>` : ""}
+    </div>`).join("");
+}
+
+function renderDrafts(rid) {
+  if (!rid) { return; }
+  api.get(`/feedback/drafts?review_report_id=${encodeURIComponent(rid)}`).then(d => {
+    const drafts = d.drafts || [];
+    document.getElementById("drafts").innerHTML = drafts.length
+      ? `<div class="banner warn">${esc(d.note || "")}</div>` + drafts.map(x => `
+        <div class="panel" style="padding:12px 14px;margin-bottom:9px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:baseline">
+            <b>${esc(x.proposal)}</b>
+            <span class="chip">${esc(x.kind)}</span>
+            <span class="chip ${["tiny", "small"].includes(x.magnitude) ? "ok" : "warn"}">
+              幅度 ${esc(x.magnitude)}</span>
+            ${x.needs_human_review ? '<span class="chip warn">需人工确认</span>' : ""}
+          </div>
+          <div class="hint" style="margin:6px 0 0">${esc(x.rationale || "")}</div>
+          <div class="hint" style="margin:4px 0 0">证据引用（${(x.evidence_refs || []).length} 条）：
+            ${(x.evidence_refs || []).map(r => `<code>${esc(r.slice(0, 8))}</code>`).join(" ")}</div>
+          <div class="actions" style="margin:9px 0 0">
+            <button data-draft='${esc(JSON.stringify(x))}'>带去「反馈下一轮」登记</button>
+          </div>
+        </div>`).join("")
+      : `<div class="empty">这份报告没有产生候选草稿。</div>`;
+    document.querySelectorAll("[data-draft]").forEach(b => b.onclick = () => {
+      sessionStorage.setItem("cwb.draft", b.dataset.draft);
+      location.href = "/views/FeedbackLoop.html";
+    });
+  }).catch(e => {
+    document.getElementById("drafts").innerHTML =
+      `<div class="empty">草稿读取失败：${esc(String(e))}</div>`;
+  });
+}
+
+const loadPubs = guard(async () => {
+  const priorContent = document.getElementById("sel-content").value
+    || new URLSearchParams(location.search).get("content") || "";
+  const priorPublication = document.getElementById("sel-pub").value;
+  const c = await api.get("/contents");
+  const cs = document.getElementById("sel-content");
+  cs.innerHTML = '<option value="">— 选择内容（生成复盘用）—</option>'
+    + (c.items || []).map(x =>
+      `<option value="${esc(x.id)}">${esc(x.display_id)} · ${esc(x.topic || "")}</option>`).join("");
+  // Select defaults before asynchronous comment loading; a user's later choice wins.
+  cs.value = (c.items || []).some(x => x.id === priorContent) ? priorContent : (c.items || [])[0]?.id || '';
+  const contentId = cs.value;
+  const p = contentId ? await api.get(`/publications?content_id=${encodeURIComponent(contentId)}`) : {items:[]};
+  if (cs.value !== contentId) return;
+  PUBLICATIONS = (p.items || []).filter(x => x.platform_post_id || x.link);
+  const sel = document.getElementById("sel-pub");
+  sel.innerHTML = '<option value="">— 选择发布记录 —</option>' + PUBLICATIONS.map(x =>
+    `<option value="${esc(x.id)}">${esc(x.platform)} · ${esc(x.platform_post_id || x.link || x.id.slice(0, 8))}
+      ${x.verified ? "（已核验）" : "（未核验）"}</option>`).join("");
+  CURRENT = null;
+  renderCluster(null);
+  log(`当前内容可选发布记录 ${PUBLICATIONS.length} 条（只列有平台标识的）。`);
+  if (PUBLICATIONS.some(x => x.id === priorPublication)) sel.value = priorPublication;
+  const reportsReady = cs.value ? loadReports(cs.value) : Promise.resolve();
+  const candidates = sel.value ? PUBLICATIONS.filter(x => x.id === sel.value) : PUBLICATIONS;
+
+  // 自动挑一条真的"有评论样本"的发布记录，否则开页就是空表，容易误以为功能没接上。
+  for (const pub of candidates) {
+    const cl = await api.get(`/comments/cluster?publication_id=${encodeURIComponent(pub.id)}`)
+      .catch(() => null);
+    if (cs.value !== contentId) return;
+    if (cl && (cl.total_comments || 0) > 0) {
+      sel.value = pub.id;
+      CURRENT = pub.id;
+      renderCluster(cl);
+      log(`已选中当前内容的一条发布记录（${cl.total_comments} 条评论）。`);
+      break;
+    }
+  }
+  if (!CURRENT && candidates.length) {
+    sel.value = candidates[0].id;
+    CURRENT = candidates[0].id;
+    const cl = await api.get(`/comments/cluster?publication_id=${encodeURIComponent(CURRENT)}`)
+      .catch(() => null);
+    if (cs.value === contentId) renderCluster(cl);
+  }
+
+  // 内容侧也自动选中第一条，并带上它已有的复盘
+  await reportsReady;
+});
+
+document.getElementById("sel-pub").onchange = guard(async () => {
+  const id = document.getElementById("sel-pub").value;
+  if (!id) { CURRENT = null; renderCluster(null); return; }
+  CURRENT = id;
+  const c = await api.get(`/comments/cluster?publication_id=${encodeURIComponent(id)}`);
+  renderCluster(c);
+  log(`评论样本 ${c.total_comments} 条，分 ${(c.groups || []).length} 组（规则分类，非模型推断）。`);
+});
+
+const loadReports = guard(async (contentId) => {
+  if (!contentId) return;
+  const r = await api.get(`/contents/${contentId}/reviews`);
+  if (document.getElementById("sel-content").value !== contentId) return;
+  const details = await Promise.all((r.items || []).map(item => api.get(`/reviews/${item.id}`)));
+  if (document.getElementById("sel-content").value !== contentId) return;
+  REPORTS = details;
+  renderReports(REPORTS);
+  renderLevels(REPORTS.length ? REPORTS[0].data_sufficiency : "none");
+  if (REPORTS.length) {
+    log(`复盘报告 ${REPORTS.length} 份；最新 v${REPORTS[0].version}，充足度 ${REPORTS[0].data_sufficiency}。`);
+    renderDrafts(REPORTS[0].id);
+  } else {
+    document.getElementById("drafts").innerHTML =
+      '<div class="empty">生成复盘后会在这里看到候选草稿。</div>';
+  }
+});
+
+document.getElementById("sel-content").onchange = guard(async () => {
+  await loadPubs();
+});
+
+document.getElementById("btn-refresh").onclick = guard(async () => {
+  await loadPubs();
+  const cid = document.getElementById("sel-content").value;
+  if (cid) await loadReports(cid);
+  if (CURRENT) {
+    const c = await api.get(`/comments/cluster?publication_id=${encodeURIComponent(CURRENT)}`);
+    renderCluster(c);
+  }
+  toast("已刷新。", "ok");
+});
+
+document.getElementById("btn-gen").onclick = guard(async () => {
+  const cid = document.getElementById("sel-content").value;
+  if (!cid) { toast("先在右边选一条内容。", "err"); return; }
+  const r = await api.post(`/contents/${cid}/reviews`, {
+    hypotheses: [], experiments: [], next_topics: [],
+    run_mode: (await api.get(`/contents/${cid}`)).display_id.startsWith("DEMO-") ? "fixture" : "real",
+  });
+  log(`已生成复盘 v${r.version}：充足度 ${r.data_sufficiency}，观察 ${(r.observations || []).length} 条，`
+    + `分类方式 ${r.generation_mode}。`, "ok");
+  log(`限制：${(r.limitations || []).join("；")}`);
+  toast("复盘已生成。旧版本未被改动。", "ok");
+  await loadReports(cid);
+});
+
+document.getElementById("status").innerHTML = await statusBar();
+renderLevels("none");
+await loadPubs();
+log("页面就绪。评论分布来自 GET /api/v1/comments/cluster，复盘来自 /contents/{id}/reviews。");
+</script>
+</body>
+</html>

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>内容工作台 · 集中处理</title>
+<link rel="stylesheet" href="/assets/app.css?v=20261004-discard1" />
+<style>
+  .item { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:13px 15px; margin-bottom:10px; }
+  .item.major { border-left:3px solid var(--err); }
+  .item .head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .item .title { font-weight:600; font-size:13.5px; }
+  .item .body { font-size:12.5px; color:var(--muted); margin-top:6px; }
+  .item .act { font-size:12.5px; margin-top:8px; }
+  .item.done { opacity:.6; }
+  .sev { font-size:10.5px; padding:2px 8px; border-radius:999px; border:1px solid var(--line); }
+  .sev.critical { color:var(--err); border-color:color-mix(in srgb,var(--err) 45%,var(--line)); }
+  .sev.high { color:var(--warn); border-color:color-mix(in srgb,var(--warn) 45%,var(--line)); }
+  .sev.medium { color:var(--accent); border-color:color-mix(in srgb,var(--accent) 40%,var(--line)); }
+  .sev.low { color:var(--muted); }
+  .tag { font-size:10.5px; padding:2px 7px; border-radius:4px;
+    background:color-mix(in srgb,var(--err) 12%,transparent); color:var(--err); }
+  .btns { display:flex; gap:7px; margin-top:10px; flex-wrap:wrap; }
+  .ack { color:var(--accent); } .res { color:var(--ok); }
+  .folded { background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:10px 14px; font-size:12px; max-height:230px; overflow:auto;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
+  .folded .ln { padding:3px 0; border-bottom:1px dashed var(--line); display:flex; gap:9px; }
+  .folded .ln:last-child { border-bottom:0; }
+  .folded .c { color:var(--muted); min-width:36px; text-align:right; flex:none; }
+  .kv { display:flex; justify-content:space-between; gap:14px; font-size:12.5px;
+    padding:6px 0; border-bottom:1px dashed var(--line); }
+  .kv:last-child { border-bottom:0; }
+  .kv > span:last-child { color:var(--muted); text-align:right; }
+</style>
+<link rel="stylesheet" href="/assets/workbench.css?v=20261005"></head>
+<body>
+<nav class="nav" id="nav"></nav>
+
+<div class="wrap">
+  <h1>集中处理</h1>
+  <div class="sub">把所有「需要人看一眼」的事收拢到一页：聚合、排序、记录处理时长。</div>
+
+  <div id="status"></div>
+
+  <div class="banner warn">
+    <strong>本页只读 + 只记录，不做自动决策。</strong>
+    这里不提供「一键全部修复」，也不会自动批准、自动发布、自动重试、自动删文件。
+    只有两个写操作：<b>标记已看到</b>（开始计时）与 <b>标记已处理</b>（结算时长）。
+    职责是「把要人管的东西集中起来」，不是「减少人管的东西」。
+  </div>
+
+  <div class="grid" id="stats"></div>
+
+  <h2>重大项 <span class="hint" style="display:inline">影响已批准版本的改动 —— 不处理会直接导致发错</span></h2>
+  <div class="hint">缺图、批准失效、模型越权、结果未知。这类事不允许被日常流水冲走，固定置顶。</div>
+  <div id="major"></div>
+
+  <h2>待处理 <span class="hint" style="display:inline" id="items-cnt"></span></h2>
+  <div class="hint">同类异常已折叠成一条，但<b>计数与起止时间保留</b> —— 折叠是为了少看几行，不是让你以为只有一条。</div>
+  <div id="items"></div>
+
+  <h2>日志折叠 <span class="hint" style="display:inline">连续相同消息只留一条</span></h2>
+  <div class="folded" id="folded"></div>
+
+  <h2>人工处理时长</h2>
+  <div class="hint">用于估算真实人工负担。<b>没记录就是 null，不等于 0 秒</b>；缺「已看到」记录的处理单列，不并进平均。</div>
+  <div class="panel" style="padding:14px 16px;max-width:560px" id="handling"></div>
+
+  <h2>能力边界</h2>
+  <div class="panel" style="padding:14px 16px;max-width:560px" id="caps"></div>
+
+  <h2>操作日志</h2>
+  <div class="log" id="log"></div>
+</div>
+
+<script type="module">
+import { api, navBar, statusBar, toast, log, guard, esc } from "/assets/app.js?v=20261005";
+
+document.getElementById("nav").innerHTML = navBar("Attention");
+
+const SEV_LABEL = { critical: "严重", high: "高", medium: "中", low: "低" };
+
+function fmtTime(iso) {
+  if (!iso) return '<span class="missing">未记录</span>';
+  const d = new Date(iso);
+  return isNaN(d) ? esc(iso)
+    : d.toLocaleString("zh-CN", { hour12: false, month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit" });
+}
+
+function secs(v) {
+  if (v === null || v === undefined) return '<span class="missing">null（无记录，不等于 0 秒）</span>';
+  return `${Number(v).toFixed(1)} s`;
+}
+
+function itemHTML(it) {
+  const cls = ["item", it.is_major ? "major" : "", it.resolved_at ? "done" : ""].join(" ").trim();
+  const fold = it.count > 1
+    ? `<span class="chip warn" title="同类异常折叠，实际发生 ${it.count} 次">×${it.count}</span>` : "";
+  const majorTag = it.is_major ? `<span class="tag">重大</span>` : "";
+  const range = it.count > 1
+    ? `${fmtTime(it.first_seen)} → ${fmtTime(it.last_seen)}` : fmtTime(it.first_seen);
+  const dur = (it.handling_seconds === null || it.handling_seconds === undefined)
+    ? `<span class="missing">处理时长 null（未记录，不等于 0 秒）</span>`
+    : `处理时长 ${Number(it.handling_seconds).toFixed(1)}s`
+      + (it.acknowledged_at ? `（已看到 ${fmtTime(it.acknowledged_at)}）` : "");
+  const entity = it.entity_id
+    ? `${esc(it.entity_type || "")} / <code>${esc(it.entity_id)}</code>`
+    : '<span class="missing">未绑定对象</span>';
+  const who = it.acknowledged_by ? `已看到：${esc(it.acknowledged_by)}` : "";
+  const who2 = it.resolved_by ? `　已处理：${esc(it.resolved_by)}` : "";
+  const detail = it.detail ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">明细</summary><pre style="margin-top:6px">${esc(JSON.stringify(it.detail, null, 2))}</pre></details>` : "";
+
+  return `<div class="${cls}">
+    <div class="head">
+      <span class="sev ${esc(it.severity)}">${esc(SEV_LABEL[it.severity] || it.severity)}</span>
+      ${majorTag} <span class="title">${esc(it.title)}</span> ${fold}
+      <span style="color:var(--muted);font-size:11.5px">${esc(it.kind)}</span>
+    </div>
+    <div class="body">
+      对象：${entity}<br/>
+      ${range}　·　${it.needs_action ? "需要人工决策" : "记录性提示"}　·　${dur}
+      ${who || who2 ? `<br/>${who}${who2}` : ""}
+    </div>
+    <div class="act"><b>建议：</b>${esc(it.suggested_action || "")}</div>
+    ${detail}
+    <div class="btns">
+      <button class="ack" data-ack="${esc(it.key)}" ${it.acknowledged_at ? "disabled" : ""}>标记已看到</button>
+      <button class="res" data-res="${esc(it.key)}" ${it.resolved_at ? "disabled" : ""}>标记已处理</button>
+    </div>
+  </div>`;
+}
+
+let INDEX = {};   // key → item，供按钮取 kind / entity_id
+
+function render(report) {
+  const s = report.summary || {};
+  const stats = [
+    { n: s.major_count ?? 0, l: "重大项（影响已批准版本）", cls: (s.major_count || 0) > 0 ? "is-err" : "is-null" },
+    { n: s.item_count ?? 0, l: "待处理条目（已折叠）", cls: (s.item_count || 0) ? "" : "is-null" },
+    { n: s.needs_action ?? 0, l: "需要人工决策", cls: (s.needs_action || 0) ? "is-warn" : "is-null" },
+    { n: s.total_occurrences ?? 0, l: "异常发生次数（未折叠）", cls: (s.total_occurrences || 0) ? "" : "is-null" },
+    { n: s.scanned_events ?? 0, l: "扫描过的事件", cls: "" },
+  ];
+  document.getElementById("stats").innerHTML = stats.map(c =>
+    `<div class="card ${c.cls}"><div class="n">${c.n}</div><div class="l">${esc(c.l)}</div></div>`).join("");
+
+  INDEX = {};
+  for (const it of [...(report.major || []), ...(report.items || [])]) INDEX[it.key] = it;
+
+  document.getElementById("major").innerHTML = (report.major || []).length
+    ? report.major.map(itemHTML).join("")
+    : '<div class="empty">无重大项。影响已批准版本的改动才会出现在这里。</div>';
+
+  const items = report.items || [];
+  document.getElementById("items-cnt").textContent =
+    `${items.length} 条 · 实际发生 ${items.reduce((a, i) => a + (i.count || 0), 0)} 次`;
+  document.getElementById("items").innerHTML = items.length
+    ? items.map(itemHTML).join("")
+    : '<div class="empty">暂无待处理项。</div>';
+
+  const fl = report.folded_logs || [];
+  document.getElementById("folded").innerHTML = fl.length
+    ? fl.map(f => `<div class="ln">
+        <span class="c">×${f.count}</span>
+        <span style="flex:1">${esc(f.message)}<br/>
+          <span style="color:var(--muted);font-size:11px">${esc(f.type)}</span></span>
+        <span style="color:var(--muted);font-size:11px;flex:none">
+          ${fmtTime(f.first_seen)} → ${fmtTime(f.last_seen)}</span>
+      </div>`).join("")
+    : '<div class="empty">无日志。</div>';
+
+  if (report.note) log(report.note);
+
+  bindButtons();
+}
+
+function bindButtons() {
+  document.querySelectorAll("[data-ack]").forEach(b => b.onclick = guard(async () => {
+    const it = INDEX[b.dataset.ack];
+    b.disabled = true;
+    const r = await api.post("/attention/acknowledge",
+      { kind: it.kind, entity_id: it.entity_id, actor: "rosso" });
+    log(`已标记「已看到」：${it.kind} ${it.entity_id || "(全局)"}。开始计处理时长。`, "ok");
+    log(`后端返回 acknowledged_by = ${r.acknowledged_by}，at = ${r.at}。`);
+    toast("已标记已看到（只记录事实，不改业务状态）。", "ok");
+    await load();
+  }));
+
+  document.querySelectorAll("[data-res]").forEach(b => b.onclick = guard(async () => {
+    const it = INDEX[b.dataset.res];
+    b.disabled = true;
+    const r = await api.post("/attention/resolve",
+      { kind: it.kind, entity_id: it.entity_id, actor: "rosso", note: "在集中处理页标记已处理" });
+    const hs = r.handling_seconds;
+    if (hs === null || hs === undefined) {
+      log(`未结算处理时长：${r.handling_note || "找不到「已看到」记录"}。`
+        + "后端返回 handling_seconds = null，前端如实显示 null，不补 0。", "err");
+    } else {
+      log(`已结算处理时长 ${Number(hs).toFixed(1)}s（${r.resolved_by}）。`, "ok");
+    }
+    toast("已标记已处理。", "ok");
+    await load();
+  }));
+}
+
+const load = guard(async () => {
+  const [rep, hs] = await Promise.all([
+    api.get("/attention"),
+    api.get("/attention/handling-stats"),
+  ]);
+  render(rep);
+
+  document.getElementById("handling").innerHTML = [
+    ["已结算处理单", `${hs.resolved_count ?? 0} 单`],
+    ["累计处理时长", secs(hs.handling_seconds_total)],
+    ["平均处理时长", secs(hs.handling_seconds_avg)],
+    ["最长一次", secs(hs.handling_seconds_max)],
+    ["缺「已看到」记录", `${hs.records_missing_ack ?? 0} 单（未并入平均）`],
+    ["说明", esc(hs.note || "")],
+  ].map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><span>${v}</span></div>`).join("");
+
+  const caps = rep.capabilities || {};
+  document.getElementById("caps").innerHTML = [
+    ["本页读写", caps.read_only === false ? "可写" : "只读 + 两个记录动作"],
+    ["自动动作", (caps.auto_actions || []).length
+      ? (caps.auto_actions || []).map(a => `<code>${esc(a)}</code>`).join(" ")
+      : '<span class="missing">无（不自动批准 / 不自动发布 / 不自动重试 / 不自动删文件）</span>'],
+    ["说明", esc(caps.note || rep.note || "")],
+  ].map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><span>${v}</span></div>`).join("");
+});
+
+document.getElementById("status").innerHTML = await statusBar();
+await load();
+log("页面就绪。数据来自 GET /api/v1/attention 与 /attention/handling-stats。");
+</script>
+</body>
+</html>

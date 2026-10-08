@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "id": "knowledge",
+      "name": "知识讲解",
+      "description": "图片、关键词与语义插画交替出现，适合观点和知识分享。",
+      "intent_priority": ["chart", "compare", "flow", "checklist", "scroll"],
+      "fallback_sequence": ["focus", "keyword", "scroll", "keyword", "image"]
+    },
+    {
+      "id": "process",
+      "name": "流程演示",
+      "description": "先展示内容，再逐步展开过程与检查事项，适合教程和操作说明。",
+      "intent_priority": ["chart", "flow", "checklist", "compare", "scroll"],
+      "fallback_sequence": ["focus", "flow", "checklist", "scroll"]
+    },
+    {
+      "id": "comparison",
+      "name": "对比分析",
+      "description": "强调差异、并列关系和原文数值，适合方案比较与复盘。",
+      "intent_priority": ["chart", "compare", "checklist", "flow", "scroll"],
+      "fallback_sequence": ["focus", "compare", "keyword", "scroll"]
+    }
+  ]
+}

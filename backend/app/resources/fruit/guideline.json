@@ -1,0 +1,22 @@
+{
+  "source": {
+    "id": "BJ_HEALTH_2025",
+    "kind": "official_health_guidance",
+    "url": "https://wjw.beijing.gov.cn/wjwh/ztzl/tzglkp/tzyxjz/202504/t20250425_4074637.html",
+    "retrieved_at": "2026-10-04T00:00:00+00:00",
+    "locator": "《健康体重9问9答》2025-04-25，第5问；经网页读取核验，以下是摘要而非逐字引用",
+    "excerpt": "成人平衡膳食中每日水果总量参考为200～350克；成人饮水等其他食物的推荐量另列。",
+    "excerpt_basis": "document",
+    "sha256": "9b56b0fe954237fbc4425a506f0f263077347a364e57b96a174fe9fbe44fb7dd",
+    "access_state": "ok",
+    "limitations": "普通成人膳食建议，不作为糖尿病患者个人处方。"
+  },
+  "claim": {
+    "id": "FRUIT_PORTION",
+    "kind": "fact",
+    "statement": "成人平衡膳食中每日水果总量参考为200～350克；成人饮水等其他食物的推荐量另列。",
+    "source_ids": [
+      "BJ_HEALTH_2025"
+    ]
+  }
+}

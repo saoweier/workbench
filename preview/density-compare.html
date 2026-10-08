@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文字密度修复对比 · C001 抖音</title>
+<style>
+  :root { --ink:#16181C; --sub:#6E7681; --line:#E3E0DA; --accent:#D9542B; --bg:#FAF8F5; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:"Noto Sans CJK SC","PingFang SC",sans-serif; background:var(--bg); color:var(--ink); padding:40px; line-height:1.6; }
+  h1 { font-size:30px; font-weight:800; letter-spacing:-.02em; }
+  h1 span { color:var(--accent); }
+  .lead { color:var(--sub); margin-top:10px; font-size:15px; max-width:900px; }
+  .note { background:#fff; border:1px solid var(--line); border-left:4px solid var(--accent); border-radius:6px; padding:16px 20px; margin:24px 0 8px; font-size:14px; }
+  .note b { color:var(--accent); }
+  .row { display:flex; gap:28px; align-items:flex-start; margin-top:28px; flex-wrap:wrap; }
+  .col { flex:1 1 420px; min-width:320px; }
+  .col h2 { font-size:17px; font-weight:800; margin-bottom:6px; display:flex; align-items:center; gap:8px; }
+  .tag { font-size:12px; font-weight:700; padding:2px 9px; border-radius:99px; }
+  .tag.bad { background:#FBE9E2; color:#B33A17; }
+  .tag.good { background:#E4F3E7; color:#22703A; }
+  .metric { font-size:13px; color:var(--sub); margin-bottom:14px; }
+  .metric b { color:var(--ink); font-weight:700; }
+  .strip { display:flex; gap:12px; overflow-x:auto; padding-bottom:10px; }
+  .strip figure { flex:0 0 auto; }
+  .strip img { width:230px; height:auto; border-radius:8px; border:1px solid var(--line); display:block; background:#fff; }
+  .strip figcaption { font-size:12px; color:var(--sub); text-align:center; margin-top:6px; }
+  table { border-collapse:collapse; margin-top:34px; font-size:14px; background:#fff; border:1px solid var(--line); border-radius:8px; overflow:hidden; width:100%; }
+  th,td { text-align:left; padding:10px 14px; border-bottom:1px solid var(--line); }
+  th { background:#F3F0EB; font-weight:700; font-size:13px; }
+  tr:last-child td { border-bottom:none; }
+  td.up { color:#22703A; font-weight:700; }
+</style>
+</head>
+<body>
+  <h1>C001 抖音图文 · 文字密度修复<span> 对比</span></h1>
+  <p class="lead">用户反馈："一大张图，就一两行字。" 定位到两个叠加原因：<b>每页内容量不足</b>（原均 30 字/页）＋<b>版式把内容挤在顶部</b>（页脚 <code>margin-top:auto</code> 把大段空白留在中间）。两处都已修复。</p>
+
+  <div class="note">
+    <b>修复动作</b>：① 每页正文由 3 条扩到 4–5 条、信息量补到 64–101 字/页，并加入具体例子；② 版式改为 <b>垂直均分（flex space-between）</b>，正文列表吸收剩余高度并整体居中，页脚仍贴底；③ 新增 <b>PAGE_DENSITY_LOW</b> 告警，单页信息量低于阈值时渲染前提示。模板版本 <b>@6 → @8</b>，新的渲染必须换版本号，旧审核不受影响。
+  </div>
+
+  <div class="row">
+    <div class="col">
+      <h2>修复前 <span class="tag bad">空洞</span></h2>
+      <p class="metric">平均墨迹密度 <b>2.8%</b> · 正文 3 条 · 正文区仅占可用高度约 <b>35%</b></p>
+      <div class="strip">
+        <figure><img src="old/page-01.png" alt="旧 1"><figcaption>P1 封面</figcaption></figure>
+        <figure><img src="old/page-02.png" alt="旧 2"><figcaption>P2</figcaption></figure>
+        <figure><img src="old/page-03.png" alt="旧 3"><figcaption>P3</figcaption></figure>
+        <figure><img src="old/page-04.png" alt="旧 4"><figcaption>P4</figcaption></figure>
+        <figure><img src="old/page-05.png" alt="旧 5"><figcaption>P5</figcaption></figure>
+      </div>
+    </div>
+    <div class="col">
+      <h2>修复后 <span class="tag good">撑满整版</span></h2>
+      <p class="metric">平均墨迹密度 <b>4.8%</b> · 正文 4–5 条 · 正文区约占可用高度 <b>62–70%</b></p>
+      <div class="strip">
+        <figure><img src="new/page-01.png" alt="新 1"><figcaption>P1 封面</figcaption></figure>
+        <figure><img src="new/page-02.png" alt="新 2"><figcaption>P2</figcaption></figure>
+        <figure><img src="new/page-03.png" alt="新 3"><figcaption>P3</figcaption></figure>
+        <figure><img src="new/page-04.png" alt="新 4"><figcaption>P4</figcaption></figure>
+        <figure><img src="new/page-05.png" alt="新 5"><figcaption>P5</figcaption></figure>
+      </div>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr><th>指标</th><th>修复前</th><th>修复后</th><th>变化</th></tr></thead>
+    <tbody>
+      <tr><td>正文条数 / 页</td><td>3</td><td>4–5</td><td class="up">+1~2 条</td></tr>
+      <tr><td>信息量（标题+正文）</td><td>约 43–72 字</td><td>64–101 字</td><td class="up">+45%</td></tr>
+      <tr><td>墨迹密度（非背景像素占比）</td><td>2.8%</td><td>4.8%</td><td class="up">+71%</td></tr>
+      <tr><td>模板版本</td><td>cover@6 / checklist@6</td><td>cover@8 / checklist@8</td><td class="up">结构升级</td></tr>
+      <tr><td>渲染前密度告警</td><td>无</td><td>PAGE_DENSITY_LOW（阈值封面 40 / 内页 50 字）</td><td class="up">新增</td></tr>
+    </tbody>
+  </table>
+</body>
+</html>

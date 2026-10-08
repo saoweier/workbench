@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>内容工作台 · 集中预览</title>
+<link rel="stylesheet" href="/assets/studio.css" /><link rel="stylesheet" href="/assets/app.css?v=20261004-discard1" />
+<style>
+  .wrap { max-width:1240px; }
+  .tabs { display:flex; gap:8px; margin:14px 0 18px; flex-wrap:wrap; }
+  .tab { padding:7px 16px; border-radius:8px; border:1px solid var(--line); background:var(--panel);
+    cursor:pointer; font-size:13px; color:var(--muted); }
+  .tab.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .meta { display:flex; gap:9px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+  .grid2 { display:grid; gap:18px; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); }
+  .pcard { background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; }
+  .pcard img { width:100%; display:block; background:var(--bg); }
+  .page-open { display:block; width:100%; padding:0; border:0; border-radius:0; background:none; cursor:zoom-in; }
+  .page-open:focus-visible { outline:3px solid var(--accent); outline-offset:-3px; }
+  .page-zoom { border:0; padding:16px; border-radius:18px; max-width:94vw; max-height:94vh; background:var(--panel); color:var(--text); }
+  .page-zoom::backdrop { background:rgba(18,31,28,.74); }
+  .page-zoom img { display:block; max-width:85vw; max-height:78vh; width:auto; height:auto; margin:auto; }
+  .zoom-tools { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:12px; }
+  .upgrade-tools { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin:14px 0; }
+  .upgrade-tools select { padding:10px; border:1px solid var(--line); border-radius:9px; background:var(--panel); color:var(--text); }
+  .pcard .cap { padding:9px 12px; font-size:12px; color:var(--muted); display:flex;
+    justify-content:space-between; align-items:center; gap:8px; }
+  .pcard .cap b { color:var(--text); font-weight:600; }
+  .pcard .pg-body { padding:0 12px 10px; font-size:11.5px; color:var(--muted); }
+  .kv { display:flex; justify-content:space-between; gap:14px; font-size:12.5px; padding:6px 0;
+    border-bottom:1px dashed var(--line); }
+  .kv:last-child { border-bottom:0; }
+  .kv > span:last-child { color:var(--muted); text-align:right; }
+  button.approve { background:var(--ok); border-color:var(--ok); color:#fff; }
+</style>
+<link rel="stylesheet" href="/assets/workbench.css?v=20261005"></head>
+<body>
+<nav class="nav" id="nav"></nav>
+
+<div class="wrap">
+  <h1>集中预览 <span class="hint" style="display:inline" id="title-cap"></span></h1>
+  <div class="sub">一次集中审阅双平台成品，通过 / 修改 / 暂缓。人工发布仍由本人操作。</div>
+
+<div class="actions studio-section" style="padding:14px"><a class="btn" id="preview-to-video" href="/views/VideoStudio.html">把这份图文转成讲解视频 →</a><a class="btn" href="/views/PublishingHub.html">选择发布与回访方式</a></div>
+  <div id="status"></div>
+
+  <div class="banner">
+    <strong>审阅实际图文成品</strong> · 点击图片可放大阅读。先核对内容与配图，再通过并导出发布包。
+    图片尺寸可调整；上传兼容性需在实际发布时核对。
+  </div>
+
+  <div class="upgrade-tools">
+    <label for="illustrate-mode">制作方式</label>
+    <select id="illustrate-mode"><option value="real">使用已配置的 AI 模型</option><option value="local_seed">本地规则图解</option></select>
+    <button id="btn-illustrate" class="primary">制作图文新版本</button>
+    <span class="hint">补充图解与示例，保留旧稿。使用 AI 模型会产生 API 调用。</span>
+  </div>
+  <div id="illustrate-progress" class="banner" style="display:none" aria-live="polite"></div>
+
+  <div class="actions">
+    <select id="sel-content" style="min-width:320px;padding:6px 9px;border:1px solid var(--line);
+      border-radius:7px;background:var(--panel);color:var(--text);font:inherit;font-size:13px"></select>
+    <button id="btn-render">重新渲染当前平台稿</button>
+    <button id="btn-refresh">刷新</button>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+  <div class="meta" id="meta"></div>
+  <div class="grid2" id="pages"></div>
+
+  <h2>正文文案</h2>
+  <pre id="caption"></pre>
+
+  <section class="studio-section" style="padding:18px;margin:18px 0"><h2>资料与生成诊断</h2><p class="hint">看实际原文、搜索状态、每一步输入输出和当时使用的技能规则。</p><details id="diagnostic-details"><summary>展开诊断：这篇内容为什么这样写</summary><div id="content-diagnostic"></div></details><a class="btn" id="diagnostic-link" href="/views/SkillWorkflow.html">技能管理与诊断 →</a></section><h2>版本与证据边界</h2>
+  <div class="panel" style="padding:14px 16px" id="meta-kv"></div>
+
+  <h2>P2 – P3 自动生产溯源</h2>
+  <div id="trace"></div>
+
+  <h2>P4 发布与数据</h2>
+  <div class="panel" style="padding:14px 16px" id="p4"></div>
+
+<section class="studio-section" id="revision-studio" style="padding:22px;margin:18px 0">
+    <h2 style="margin-top:0">内容再调整</h2><p class="hint">描述哪里偏了、必须包含什么、希望怎样呈现。调整会实际改写成新版本，并保留旧稿。</p>
+    <div class="actions" id="revision-shortcuts"><button data-adjust="更短更精简，删除重复解释，保留全部具体对象和核心事实。">更短更精简</button><button data-adjust="更详细，补充每项的具体理由和实用细节，保留页数、全部对象及统计口径。">更详细</button><button data-adjust="风格更活跃，用生动直接的表达，保留事实、对象、名次与页数。">更活跃</button><button data-adjust="只调整为简洁精致的视觉风格，保留全部事实、对象、名次与页数。">更精致</button></div><label for="revision-requirements">修改要求</label><textarea id="revision-requirements" rows="4" maxlength="3000" style="width:100%" placeholder="例如：更短更精简；每项加一句说明；风格更活跃。原选题、榜单数量和页数会保留，除非你明确要求修改。"></textarea>
+    <div class="actions" style="margin:12px 0"><label for="revision-template">输出样式</label><select id="revision-template"><option value="">保留当前模板</option></select><label for="revision-direction">题材技能</label><select id="revision-direction"><option value="">保留当前方向</option><option value="auto">自动识别</option><option value="tech">科技与 AI</option><option value="life">生活与食养</option><option value="games">游戏</option><option value="news">新闻与热点</option><option value="work">职场与办公</option><option value="learning">学习与知识</option><option value="general">通用内容</option></select></div>
+    <details><summary>补充资料与配图</summary><textarea id="revision-materials" rows="3" maxlength="16000" style="width:100%" placeholder="粘贴参考资料，并注明来源"></textarea>
+      <label for="revision-images">上传自有配图（最多6张PNG/JPEG）</label><input type="file" accept="image/png,image/jpeg" multiple id="revision-images"><div id="revision-media" class="actions"></div>
+    </details>
+    <div class="actions"><label for="revision-scope">调整范围</label><select id="revision-scope"><option value="full">重做整篇内容</option><option value="title">当前平台标题</option><option value="caption">当前平台正文</option></select>
+      <select id="revision-mode" aria-label="修改使用方式"><option value="real">使用配置的AI模型</option><option value="local_seed">本地明确文字替换</option></select><button class="primary" id="revision-submit">按要求生成新版本</button><button id="revision-record">只记录退回意见</button></div>
+    <p class="hint">AI改稿可能产生调用费用。图片模型独立配置；缺少必要配图时会暂停并提示补充。新版本需重新审核。</p>
+    <div id="revision-message" aria-live="polite"></div>
+  </section>
+  <details class="studio-section" style="padding:18px"><summary>内容规划、审核结果与技能履历</summary><div id="skill-evidence"></div><a class="btn" href="/views/SkillWorkflow.html">管理创作技能 →</a><button id="skill-audit">按当前要求重新审核</button><div id="skill-audit-result" aria-live="polite"></div></details>
+  <details class="studio-section" style="padding:18px;margin:14px 0"><summary>与旧版本对照</summary><label for="compare-version">选择旧版</label><select id="compare-version"></select><div id="compare-output"></div></details>
+  <div class="actions">
+    <button class="approve" id="btn-approve">通过该平台成品</button>
+    <button id="btn-change">要求修改</button>
+    <button id="btn-hold">暂缓</button>
+    <button id="btn-zip">导出发布包 ZIP</button>
+  </div>
+  <div class="banner" id="result" style="display:none"></div>
+
+  <h2>操作日志</h2>
+  <div class="log" id="log"></div>
+</div>
+
+<dialog id="page-zoom" class="page-zoom" aria-label="放大阅读图文">
+  <div class="zoom-tools"><button id="zoom-prev" aria-label="上一页">←</button><b id="zoom-title"></b><button id="zoom-next" aria-label="下一页">→</button><button id="zoom-close">关闭</button></div>
+  <img id="zoom-image" alt="" / loading="lazy" decoding="async">
+</dialog>
+
+<script type="module">
+import { api, navBar, statusBar, toast, log, guard, esc, stateChip, modeChip, bytes, time } from "/assets/app.js?v=20261005";
+
+document.getElementById("nav").innerHTML = navBar("ReviewPreview");
+
+const PLATFORM = { douyin: "抖音", xiaohongshu: "小红书" };
+let DETAIL = null;     // 当前内容详情
+let CUR = null;        // 当前平台稿对象
+let PUB_BY_PR = {};    // platform_revision_id → publication
+const VISUAL_KIND = {cover:'插画封面',map:'关系图解',flow:'流程图',compare:'对比图',example:'填写示例',checklist:'检查清单'};
+let ZOOM_INDEX = 0;
+let REVISION_MEDIA=[];
+let REVISION_REQUEST=null;
+let WATCH_RUN = null;
+
+function openPage(index) {
+  const pg = (CUR?.pages || []).find(p => p.index === index);
+  if (!pg) return;
+  ZOOM_INDEX = index;
+  document.getElementById('zoom-image').src = `/api/v1/platform-revisions/${CUR.platform_revision_id}/pages/${index}`;
+  document.getElementById('zoom-image').alt = pg.heading || `第 ${index} 页`;
+  document.getElementById('zoom-title').textContent = `${index} / ${CUR.pages.length} · ${pg.heading}`;
+  document.getElementById('zoom-prev').disabled = index === 1;
+  document.getElementById('zoom-next').disabled = index === CUR.pages.length;
+  const dialog = document.getElementById('page-zoom');
+  if (!dialog.open) dialog.showModal();
+}
+document.getElementById('zoom-close').onclick = () => document.getElementById('page-zoom').close();
+document.getElementById('zoom-prev').onclick = () => openPage(ZOOM_INDEX - 1);
+document.getElementById('zoom-next').onclick = () => openPage(ZOOM_INDEX + 1);
+document.getElementById('page-zoom').addEventListener('click', e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+
+function result(html, kind = "") {
+  const el = document.getElementById("result");
+  el.className = "banner " + kind;
+  el.style.display = "block";
+  el.innerHTML = html;
+}
+
+function renderTabs() {
+  const rev = activeRev();
+  if (!rev) { document.getElementById("tabs").innerHTML = ""; return; }
+  document.getElementById("tabs").innerHTML = (rev.platforms || []).map(p =>
+    `<div class="tab ${CUR && p.platform_revision_id === CUR.platform_revision_id ? "active" : ""}"
+      data-pr="${esc(p.platform_revision_id)}">
+      ${esc(PLATFORM[p.platform] || p.platform)} · ${p.page_count ?? 0} 页
+    </div>`).join("");
+  document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+    CUR = findPr(t.dataset.pr);
+    renderAll();
+  });
+}
+
+function activeRev() {
+  if (!DETAIL) return null;
+  const revs = DETAIL.revisions || [];
+  return revs.find(r => r.revision_id === DETAIL.active_revision_id) || revs[revs.length - 1];
+}
+
+// 内容可能一次都没成功产出（生成中止 → revisions 为空）。
+// 这时 activeRev() 返回 undefined，直接读 .revision_id 会抛 TypeError 且没有可读提示。
+function requireRev() {
+  const rev = activeRev();
+  if (!rev) throw new Error("这条内容还没有可调整的版本：它尚未成功生成过一次图文。请先在「内容生产」完成一次生成；若它已停在中途，可在内容生产页查看中止原因，或丢弃后重做。");
+  return rev;
+}
+
+// 「内容再调整 / 重新审核 / 生成图解」都要先拿到当前版本才能用。
+// 页面刚打开、内容详情还没读回来之前必须先禁用：这个模块用顶层 await 逐个读接口，
+// 浏览器 load 事件早于初始化完成就返回，用户（或自动化）完全可能在加载完成前点下去；
+// 那时 DETAIL 还是 null，requireRev() 直接抛错，请求根本没发出去，界面只弹一个瞬时
+// 提示 —— 看起来就是"点了没反应"。等 renderAll() 拿到版本后再统一启用。
+const REVISION_ENTRY_IDS = ["revision-submit", "revision-record", "skill-audit", "btn-illustrate"];
+function revisionEntries() {
+  return REVISION_ENTRY_IDS.map(id => document.getElementById(id)).filter(Boolean);
+}
+// 没有版本时同样禁用，并说明原因，而不是等用户点了按钮再报错。
+function syncRevisionControls(rev) {
+  const usable = !!rev;
+  revisionEntries().forEach(el => { el.disabled = !usable; });
+  const box = document.getElementById("revision-message");
+  if (box && !usable) {
+    box.innerHTML = "这条内容还没有可调整的版本（尚未成功生成过一次图文）。请先在「内容生产」完成一次生成；若它已停在中途，可在内容生产页查看中止原因，或丢弃后重做。";
+  }
+}
+revisionEntries().forEach(el => { el.disabled = true; });
+
+function findPr(prId) {
+  const rev = activeRev();
+  return (rev?.platforms || []).find(p => p.platform_revision_id === prId) || null;
+}
+
+function renderAll() {
+  const rev = activeRev();
+  syncRevisionControls(rev);
+  if (!rev) {
+    const canResume = ['blocked','drafting','failed'].includes(DETAIL?.state);
+    document.getElementById("pages").innerHTML = `<section class="studio-section" style="grid-column:1/-1;padding:20px">
+      <h2 style="margin-top:0">这条内容还没有生成版本</h2>
+      <p class="hint">${canResume?'如果卡在资料调研，补充可读原文或来源链接后，可以在原题上继续制作。':'当前内容没有可预览版本。'}</p>
+      ${canResume?`<label for="blocked-recovery-materials">补充资料与来源链接</label>
+      <textarea id="blocked-recovery-materials" rows="4" maxlength="16000" style="width:100%" placeholder="粘贴原文或公开来源链接；例如 GitHub README、官方公告或可读报道。"></textarea>
+      <label for="blocked-recovery-requirements">这次制作要注意什么（可选）</label>
+      <textarea id="blocked-recovery-requirements" rows="2" maxlength="4000" style="width:100%" placeholder="例如：只介绍官方已确认的手稿规模和验证边界，不写‘解决黎曼猜想’。"></textarea>
+      <div class="actions"><button class="primary" id="blocked-recovery-submit">补充资料并继续制作</button><span class="hint">保持原选题；使用已配置的 AI 模型，可能产生 API 调用。</span></div>
+      <div id="blocked-recovery-progress" class="banner" style="display:none" aria-live="polite"></div>`:''}
+      </section>`;
+    return;
+  }
+  document.getElementById("title-cap").textContent =
+    `— ${DETAIL.display_id} · ${truncate(DETAIL.topic, 30)} · 母稿 v${rev.version}`;
+  renderTabs();
+
+  if (!CUR) CUR = (rev.platforms || [])[0] || null;
+  if (!CUR) {
+    document.getElementById("meta").innerHTML = '<span class="chip warn">没有平台稿</span>';
+    document.getElementById("pages").innerHTML = '<div class="empty">还没有平台稿。</div>';
+    return;
+  }
+
+  const prof = CUR.profile || {};
+  const rspec = prof.render || {};
+  const pub = PUB_BY_PR[CUR.platform_revision_id];
+  const dec = pub?.verified ? "已核验" : (pub ? "已登记未核验" : "未登记发布");
+
+  document.getElementById("meta").innerHTML = `
+    ${stateChip(CUR.state)}
+    <span class="chip">${rspec.width_px ?? "—"} × ${rspec.height_px ?? "—"} px</span>
+    <span class="chip">${esc((rspec.format || "png").toUpperCase())}</span>
+    <span class="chip">安全边距 ${rspec.safe_margin_px ?? "—"} px</span>
+    ${prof.platform_upload_verified === false || prof.platform_upload_verified === undefined
+      ? '<span class="chip warn">未核对上传兼容性</span>'
+      : '<span class="chip ok">上传兼容性已核对</span>'}
+    <span class="chip">${esc(dec)}</span>
+    ${(CUR.pages || []).some(p => p.visual) ? '<span class="chip ok">图解成品 · 可放大阅读</span>' : '<span class="chip">文字卡片旧稿</span>'}
+    <span class="chip">manifest <code>${esc((CUR.manifest_hash || "").slice(0, 12))}</code></span>
+    ${CUR.limitations ? "" : ""}`;
+  if (prof.verification_note) {
+    document.getElementById("meta").insertAdjacentHTML("beforeend",
+      `<span class="hint" style="margin:0">${esc(prof.verification_note)}</span>`);
+  }
+
+  const pages = CUR.pages || [];
+  document.getElementById("pages").innerHTML = pages.length
+    ? pages.map(pg => `
+      <div class="pcard">
+        <button class="page-open" data-page="${pg.index}" aria-label="放大第 ${pg.index} 页：${esc(pg.heading || '')}">
+        <img src="/api/v1/platform-revisions/${esc(CUR.platform_revision_id)}/pages/${pg.index}"
+             alt="${esc(pg.heading || "")}" loading="lazy"
+             onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'empty',style:'padding:34px 0;font-size:11px',textContent:'图未生成'}))" / decoding="async">
+        </button>
+        <div class="cap"><b>P${pg.index} · ${esc(VISUAL_KIND[pg.visual?.kind] || pg.layout || "")}</b>
+          <span>${esc(pg.kicker || "")}</span></div>
+        ${(pg.body || []).length ? `<div class="pg-body">${
+          (pg.body || []).map(b => "· " + esc(b)).join("<br/>")}</div>` : ""}
+      </div>`).join("")
+    : '<div class="empty">这个平台稿还没有页面。</div>';
+  document.querySelectorAll('.page-open').forEach(b => b.onclick = () => openPage(Number(b.dataset.page)));
+
+  document.getElementById("caption").textContent =
+    `${CUR.title || ""}\n\n${CUR.caption || ""}`;
+
+  const arts = CUR.artifacts || [];
+  document.getElementById("meta-kv").innerHTML = [
+    ["内容编号 / 母稿版本", `${esc(DETAIL.display_id)} · revision v${rev.version}`],
+    ["平台稿版本", `v${CUR.version}（${esc(CUR.platform_revision_id)}）`],
+    ["母稿输入哈希", `<code>${esc((rev.input_hash || "").slice(0, 16))}…</code>`],
+    ["manifest_hash", `<code>${esc(CUR.manifest_hash || "")}</code>`],
+    ["规格版本", `<code>${esc(CUR.profile_version_id || "")}</code>`],
+    ["运行模式", `${modeChip(DETAIL.run_mode)}`],
+    ["母稿创建时间", time(rev.created_at)],
+    ["产物数量", `${arts.length} 张（合计 ${bytes(arts.reduce((a, x) => a + (x.size_bytes || 0), 0))}）`],
+  ].map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><span>${v}</span></div>`).join("");
+
+  renderTrace(rev);
+  renderP4(pub);
+  renderSkillEvidence();
+  renderVersionCompare();
+
+  if ((rev.limitations || []).length) {
+    document.getElementById("trace").insertAdjacentHTML("afterbegin",
+      `<div class="banner warn"><strong>母稿声明的证据限制（会一直挂在结论旁边）</strong>
+       <ul style="margin:5px 0 0;padding-left:20px">${
+         rev.limitations.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`);
+  }
+}
+
+function renderTrace(rev) {
+  Promise.all([api.get(`/contents/${DETAIL.id}/provider-calls`),api.get(`/contents/${DETAIL.id}/diagnostics`)]).then(([d,diagnostics]) => {
+    const research=diagnostics.runs.at(-1);
+    const s = d.summary || {};
+    const note = d.note || s.note || "";
+    document.getElementById("trace").innerHTML = `
+      <div class="banner ${(s.real_calls || 0) > 0 ? "" : "warn"}">
+        <strong>本次真实调用：${s.real_calls ?? 0} 笔</strong>　
+        fixture ${s.fixture_calls ?? 0}　local_seed ${DETAIL.run_mode === "local_seed" ? "（未调用 Provider）" : 0}
+        <div class="hint" style="margin:5px 0 0">${esc(note)}</div>
+      </div>
+      <div class="panel" style="padding:14px 16px">
+        <div class="kv"><span>运行模式</span><span>${modeChip(DETAIL.run_mode)}</span></div>
+        <div class="kv"><span>自动搜索</span><span>${
+          research ? research.search_executed ? `已执行资料搜索 · ${esc(research.search_provider||'搜索工具')} · 可用原文 ${research.factual_source_count} 份`
+            : research.search_trace?.some(t=>t.tool==='read_selected_topic'&&t.state==='ok') ? `已读取热榜原链接 · 可用原文 ${research.factual_source_count} 份 · 未执行补充搜索` : '本次未执行资料搜索，使用已有资料'
+            : '历史任务未保存搜索状态，请查看来源记录'}</span></div>
+        <div class="kv"><span>来源</span><span>${
+          DETAIL.run_mode === "local_seed"
+            ? "全部来自项目已有文档（local_seed），不是实时检索结果"
+            : esc(DETAIL.run_mode || "")}</span></div>
+        <div class="kv"><span>金额</span><span>${
+          s.reported_micro === null || s.reported_micro === undefined
+            ? '<span class="missing">未知（null ≠ 0）</span>' : esc(String(s.reported_micro))}</span></div>
+        <div class="kv"><span>调用明细</span><span>${(d.items || []).length} 条记录</span></div>
+      </div>`;
+    if ((d.items || []).length) {
+      document.getElementById("trace").insertAdjacentHTML("beforeend",
+        `<div class="panel" style="margin-top:12px"><table>
+          <thead><tr><th>阶段</th><th>模式</th><th>结果</th><th>tokens</th><th>计费</th></tr></thead>
+          <tbody>${d.items.map(c => `<tr>
+            <td>${esc(c.stage_prompt_version || c.stage || c.purpose || "")}</td>
+            <td>${esc(c.run_mode || "")}</td>
+            <td>${esc(c.state || c.result_state || c.status || "")}</td>
+            <td>${c.input_tokens ?? "—"} / ${c.output_tokens ?? "—"}</td>
+            <td>${esc(c.billing_state || "")}</td>
+          </tr>`).join("")}</tbody></table></div>`);
+    }
+  }).catch(() => {
+    document.getElementById("trace").innerHTML =
+      '<div class="empty">溯源信息读取失败。</div>';
+  });
+}
+
+function renderP4(pub) {
+  const rows = pub
+    ? [
+        ["发布登记", `已登记 · ${esc(pub.status)}`],
+        ["登记人", `<code>${esc(pub.declared?.registered_by || "")}</code>（服务端固定）`],
+        ["平台链接", pub.declared?.link
+          ? `<a href="${esc(pub.declared.link)}" target="_blank" rel="noreferrer">${esc(pub.declared.link)}</a>`
+          : '<span class="missing">未填</span>'],
+        ["平台作品 ID", pub.declared?.platform_post_id
+          ? `<code>${esc(pub.declared.platform_post_id)}</code>` : '<span class="missing">未填</span>'],
+        ["核验状态", pub.verified
+          ? `${stateChip(pub.verified.state)} · ${time(pub.verified.at)} · ${esc(pub.verified.by || "")}`
+          : '<span class="chip">未核验</span>（不显示为「正常」）'],
+        ["发布后稿子又改过", pub.revision_changed_since_publish
+          ? '<b style="color:var(--warn)">是</b>' : "否"],
+      ]
+    : [["发布登记", '<b>未登记</b> —— 人点「已发布」才建立发布记录'],
+       ["核验状态", "未核验（不显示为「正常」）"]];
+
+  rows.push(["自动发布", '<code>auto_publish = false</code>，不存在自动发布入口']);
+
+  document.getElementById("p4").innerHTML = rows.map(([k, v]) =>
+    `<div class="kv"><span>${esc(k)}</span><span>${v}</span></div>`).join("");
+}
+
+function truncate(s, n) { s = String(s || ""); return s.length > n ? s.slice(0, n) + "…" : s; }
+
+/* ---------------------------------------------------------------- 决策 */
+
+async function decide(kind) {
+  if (!CUR) { toast("没有可操作的目标平台稿。", "err"); return; }
+  const r = await api.post("/review-decisions", {
+    decision: kind,
+    actor: "rosso",
+    platform_revision_id: CUR.platform_revision_id,
+    expected_manifest_hash: CUR.manifest_hash,
+    note: kind === "request_change" ? document.getElementById("revision-requirements").value.trim() : `在集中预览页决定：${kind}`,
+  });
+  if (!r.ok) {
+    const c = (r.conflicts || [])[0] || {};
+    result(`<b>决策未生效</b>：${esc(c.message || "存在冲突")}
+      <div class="hint" style="margin:5px 0 0">${esc(r.note || "")}</div>`, "err");
+    log(`决策冲突：${c.message || ""}`, "err");
+    return;
+  }
+  const a = (r.applied || [])[0] || {};
+  const label = { approve: "通过", request_change: "要求修改", hold: "暂缓" }[kind];
+  result(`已记录「<b>${label}</b>」（actor = <code>${esc(a.actor)}</code>）。`
+    + (kind === "approve"
+      ? `<br/>批准绑定 manifest_hash <code>${esc((a.manifest_hash || "").slice(0, 12))}…</code>；
+         若图片或文案此后变更，该批准<b>自动失效</b>（不变量：过期批准不能覆盖新内容）。`
+      : `<br/>未批准状态下<b>不能导出发布包</b>（不变量：无批准记录不得产出 ready-to-publish 包）。`),
+    kind === "approve" ? "ok" : "warn");
+  log(`决策 ${kind} 已生效：platform_state=${a.platform_state}，content_state=${a.content_state}。`, "ok");
+  await load(false);
+}
+
+document.getElementById("btn-approve").onclick = guard(() => decide("approve"));
+document.getElementById("btn-change").onclick = () => {document.getElementById("revision-studio").scrollIntoView({behavior:"smooth"});document.getElementById("revision-requirements").focus();};
+document.getElementById("btn-hold").onclick = guard(() => decide("hold"));
+
+document.getElementById("btn-zip").onclick = guard(async () => {
+  if (!CUR) { toast("没有目标平台稿。", "err"); return; }
+  const r = await api.post("/packages", {
+    platform_revision_ids: [CUR.platform_revision_id], actor: "rosso",
+  });
+  result(`已生成 <b>${esc(r.zip_name)}</b>（${bytes(r.size_bytes)}）。
+    <br/>发布包<b>不含</b>密钥、私密源文档或内部日志。手动发布仍需本人完成。
+    <div class="hint" style="margin:6px 0 0">
+      <a href="/api/v1/packages/${esc(CUR.platform_revision_id)}/download">下载 ZIP</a>
+      · integration_status = ${esc(r.integration_status || "")}
+      · manual_publish_required = ${r.manual_publish_required}
+    </div>`, "ok");
+  log(`发布包已生成：${r.zip_name}（${bytes(r.size_bytes)}）。`, "ok");
+  toast("发布包已生成，可下载。", "ok");
+  await load(false);
+});
+
+document.getElementById("btn-render").onclick = guard(async () => {
+  if (!CUR) { toast("没有目标平台稿。", "err"); return; }
+  const r = await api.post(`/platform-revisions/${CUR.platform_revision_id}/render`, {});
+  log(`重新渲染完成：${(r.images || r.artifacts || r.pages || []).length} 张产物。`
+    + (r.note ? ` ${r.note}` : ""), "ok");
+  toast("已重新渲染。注意：这会改变 manifest_hash，旧的批准可能已失效。", "ok");
+  await load(false);
+});
+
+document.getElementById("btn-refresh").onclick = guard(async () => {
+  await load(false); toast("已刷新。", "ok");
+});
+
+async function renderSkillEvidence() {
+    document.getElementById('diagnostic-link').href='/views/SkillWorkflow.html?content='+encodeURIComponent(DETAIL.id);
+    const diagnostic=document.getElementById('diagnostic-details');diagnostic.ontoggle=async()=>{if(!diagnostic.open)return;const mount=document.getElementById('content-diagnostic');if(mount.dataset.loaded===DETAIL.id+DETAIL.active_revision_id)return;try{const {renderDiagnostics}=await import('/assets/content-diagnostics.js?v=agent-search-20261006');await renderDiagnostics(mount,DETAIL.id);mount.dataset.loaded=DETAIL.id+DETAIL.active_revision_id;}catch(e){log(e.message,'err');}};
+    const id=DETAIL.id;const el=document.getElementById('skill-evidence');
+    const p=activeRev()?.brief?.content_plan;
+    const recipe=activeRev()?.brief?.creative_brief;
+    if(recipe)el.dataset.direction=recipe.direction||'general';
+    el.innerHTML=p?`<h3>${esc(p.objective)}</h3><p>必须包含：${(p.required_elements||[]).map(esc).join('；')}</p><ol>${p.pages.map(pg=>`<li>${esc(pg.heading)}：${esc(pg.purpose)} · ${esc(pg.visual_brief)}</li>`).join('')}</ol>`:'<p>这个旧版本未保存独立内容规划。重做时会使用新工作流。</p>';
+    if(recipe)el.insertAdjacentHTML('afterbegin',`<p><b>题材：${esc(recipe.direction_name||recipe.direction||'通用内容')}</b> · 模板 ${esc(recipe.template_id||'illustrated')} v${esc(recipe.template_version||4)} · 原题和页数约束已保留</p>`);
+    try {const h=await api.get(`/contents/${id}/skill-history`);if(DETAIL.id!==id)return;
+      el.insertAdjacentHTML('beforeend',h.items.map(e=>`<details><summary>${esc(e.skill_name)} · ${esc(e.state)} · ${esc(e.version)}${e.direction_skill?' · '+esc(e.direction_skill.name):''}</summary><pre>${esc(JSON.stringify(e.output,null,2))}</pre></details>`).join('')||'<p>尚未执行新技能。</p>');
+    }catch(e){el.insertAdjacentHTML('beforeend',`<p>${esc(e.message)}</p>`);}
+  }
+  function renderVersionCompare() {
+    const select=document.getElementById('compare-version');const previous=select.value;
+    select.innerHTML=(DETAIL.revisions||[]).filter(r=>r.revision_id!==DETAIL.active_revision_id).map(r=>`<option value="${esc(r.revision_id)}">母稿 v${r.version}</option>`).join('');
+    if([...select.options].some(o=>o.value===previous))select.value=previous;
+    select.onchange=compare;compare();
+    function compare(){const rev=(DETAIL.revisions||[]).find(r=>r.revision_id===select.value);const old=rev?.platforms.find(p=>p.platform===CUR?.platform);const out=document.getElementById('compare-output');
+      if(!old){out.textContent='尚无同平台旧版本可对照';return;}
+      const column=(p,label)=>`<article><h3>${label}</h3><pre>${esc(p.title)}\n\n${esc(p.caption)}</pre>${(p.pages||[]).map(pg=>`<p><b>第${pg.index}页 ${esc(pg.heading)}</b><br>${(pg.body||[]).map(esc).join('；')}</p>`).join('')}</article>`;
+      out.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px">${column(old,'旧版 v'+rev.version)}${column(CUR,'当前版 v'+activeRev().version)}</div>`;
+    }
+  }
+  document.getElementById('revision-images').onchange=guard(async()=>{
+    const files=[...document.getElementById('revision-images').files];if(files.length+REVISION_MEDIA.length>6)throw Error('最多使用6张配图');
+    for(const file of files){const form=new FormData();form.append('image',file);form.append('content_id',DETAIL.id);form.append('description',file.name);
+      const res=await fetch('/api/v1/content-media',{method:'POST',headers:{'X-CWB-Local-Action':'account-connection'},body:form});const body=await res.json();if(!res.ok)throw Error(body.error?.message||body.detail||'上传失败');REVISION_MEDIA.push(body);}
+    document.getElementById('revision-media').innerHTML=REVISION_MEDIA.map(m=>`<img src="/api/v1/content-media/${m.id}/image" alt="${esc(m.description)}" style="width:90px;height:90px;object-fit:cover;border-radius:10px" loading="lazy" decoding="async">`).join('');
+  });
+  document.getElementById('revision-shortcuts').onclick=e=>{const b=e.target.closest('[data-adjust]');if(!b)return;document.getElementById('revision-requirements').value=b.dataset.adjust;document.getElementById('revision-scope').value='full';document.getElementById('revision-requirements').focus();};
+  document.getElementById('revision-record').onclick=guard(async()=>{if(document.getElementById('revision-requirements').value.trim().length<3)throw Error('先填写具体修改要求');await decide('request_change');});
+  let RECOVERY_REQUEST=null;
+  document.getElementById('pages').onclick=guard(async e=>{
+    const button=e.target.closest('#blocked-recovery-submit');if(!button)return;
+    if(WATCH_RUN)throw Error('已有任务进行中，请等待完成');
+    const materials=document.getElementById('blocked-recovery-materials').value.trim();
+    if(materials.length<8)throw Error('请先粘贴可读原文或至少一个来源链接');
+    const requirements=document.getElementById('blocked-recovery-requirements').value.trim();
+    const input={content_id:DETAIL.id,materials,requirements,run_mode:'real'};
+    const signature=JSON.stringify(input);if(RECOVERY_REQUEST?.signature!==signature)RECOVERY_REQUEST={signature,id:crypto.randomUUID()};
+    button.disabled=true;
+    try{
+      const r=await api.post(`/creation/contents/${DETAIL.id}/continue`,{request_id:RECOVERY_REQUEST.id,materials,requirements,run_mode:'real'});
+      const url=new URL(location.href);url.searchParams.set('content',DETAIL.id);url.searchParams.set('run',r.run_id);history.replaceState({},'',url);
+      await watchIllustration(r.run_id,DETAIL.id);
+    }finally{button.disabled=false;}
+  });
+  let AUDIT_REQUEST=null;
+  document.getElementById('skill-audit').onclick=guard(async()=>{
+    const button=document.getElementById('skill-audit');button.disabled=true;
+    const input={base_revision_id:requireRev().revision_id,requirements:document.getElementById('revision-requirements').value,run_mode:document.getElementById('revision-mode').value};
+    const signature=JSON.stringify(input);if(AUDIT_REQUEST?.signature!==signature)AUDIT_REQUEST={signature,id:crypto.randomUUID()};
+    try {const r=await api.post(`/contents/${DETAIL.id}/skill-audit`,{...input,request_id:AUDIT_REQUEST.id});
+      document.getElementById('skill-audit-result').innerHTML=`<h3>${r.report.passed?'审核建议：可继续人工预览':'审核建议：需要调整'}</h3><p>${esc(r.report.summary)}</p>${r.report.issues.map(i=>`<p><b>${esc(i.problem)}</b><br>${esc(i.suggestion)}</p>`).join('')}<p class="hint">${esc(r.notice)}</p>`;await renderSkillEvidence();
+    }finally{button.disabled=false;}
+  });
+  document.getElementById('revision-submit').onclick=guard(async()=>{
+    if(WATCH_RUN)throw Error('已有任务进行中，请等待完成');
+    const requirements=document.getElementById('revision-requirements').value.trim();if(requirements.length<3)throw Error('请说明具体修改要求');
+    const button=document.getElementById('revision-submit');button.disabled=true;
+    try{
+      const scope=document.getElementById('revision-scope').value;const mode=document.getElementById('revision-mode').value;const base=requireRev().revision_id;
+      const template=document.getElementById('revision-template').value;const direction=document.getElementById('revision-direction').value;
+      if(scope!=='full'&&(template||direction))throw Error('切换模板或题材技能请使用“重做整篇内容”');
+      if(scope!=='full'){
+        const label=scope==='title'?'标题':'正文';
+        const r=await api.post(`/contents/${DETAIL.id}/change-requests`,{base_revision_id:base,instruction:`${PLATFORM[CUR.platform]}${label}：${requirements}`,run_mode:mode});
+        document.getElementById('revision-message').textContent=`已实际修改为 v${r.new_revision_version}，请重新预览。`;await load(true);
+      }else{
+        if(mode!=='real')throw Error('整篇自主重做请使用AI模型；本地模式可选择标题或正文，并填写“改为：新内容”');
+        const input={base_revision_id:base,instruction:requirements,materials:document.getElementById('revision-materials').value,run_mode:mode,media_ids:REVISION_MEDIA.map(m=>m.id),template_id:template||null,direction:direction||null};
+        const signature=JSON.stringify(input);if(REVISION_REQUEST?.signature!==signature)REVISION_REQUEST={signature,id:crypto.randomUUID()};
+        const r=await api.post(`/studio/contents/${DETAIL.id}/revise`,{...input,request_id:REVISION_REQUEST.id});
+        const url=new URL(location.href);url.searchParams.set('run',r.run_id);history.replaceState({},'',url);watchIllustration(r.run_id,DETAIL.id);
+      }
+    }finally{button.disabled=false;}
+  });
+async function watchIllustration(runId, contentId) {
+  WATCH_RUN = runId;
+  const button = document.getElementById('btn-illustrate');
+  const progress = document.getElementById('illustrate-progress');
+  button.disabled = true; progress.style.display = 'block';
+  try {
+    const run = await api.get(`/runs/${runId}`);
+    if (WATCH_RUN !== runId) return;
+    if (['queued','running'].includes(run.state)) {
+      const finished = (run.jobs || []).filter(j => j.state === 'succeeded').map(j => j.stage === 'compose' ? '内容与图解设计' : j.stage === 'render' ? '图片生成' : '').filter(Boolean);
+      progress.textContent = run.state === 'queued' ? '图文制作已排队，等待后台领取。' : `正在制作图文新版本${finished.length ? ' · 已完成：'+finished.join('、') : ' · AI 正在补充解释、示例与图解'}`;
+      setTimeout(() => watchIllustration(runId, contentId), 4000);
+      return;
+    }
+    if (run.state === 'succeeded') {
+      progress.textContent = '新版本制作已完成，请查看内容规划、审核意见，并预览确认。';
+      if (document.getElementById('sel-content').value === contentId) await load(true);
+      toast('图文新版本已完成。', 'ok');
+    } else {
+      const failed = (run.jobs || []).find(j => j.error);
+      progress.textContent = `图文制作${run.state === 'failed' ? '未完成' : '已暂停'}：${run.error || failed?.error || run.blocked_stage || run.state}。旧稿仍可查看。`;
+    }
+    WATCH_RUN = null; button.disabled = false;
+    const url = new URL(location.href); url.searchParams.delete('run'); history.replaceState({}, '', url);
+  } catch (e) {
+    progress.textContent = `暂时无法读取制作进度：${e.message}。任务仍在后台，刷新可继续查看。`;
+    setTimeout(() => watchIllustration(runId, contentId), 8000);
+  }
+}
+document.getElementById('btn-illustrate').onclick = guard(async () => {
+  const rev = activeRev(); if (!rev || !DETAIL) return;
+  const response = await api.post(`/contents/${DETAIL.id}/illustrate`, {
+    base_revision_id:rev.revision_id, run_mode:document.getElementById('illustrate-mode').value
+  });
+  const url = new URL(location.href); url.searchParams.set('content', DETAIL.id); url.searchParams.set('run', response.run_id);
+  history.replaceState({}, '', url);
+  watchIllustration(response.run_id, DETAIL.id);
+});
+
+document.getElementById("sel-content").onchange = guard(async () => {
+  await load(true);
+});
+
+/* ---------------------------------------------------------------- 装载 */
+
+async function load(reset) {
+  const cid = document.getElementById("sel-content").value;
+  if (!cid) { toast("先选一条内容。", "err"); return; }
+  if(DETAIL?.id!==cid){REVISION_MEDIA=[];document.getElementById('revision-media').innerHTML='';REVISION_REQUEST=null;}
+  const loaded=await api.get(`/contents/${cid}`);if(document.getElementById('sel-content').value!==cid)return;DETAIL=loaded;
+  renderSkillEvidence();
+  document.getElementById("preview-to-video").href = `/views/VideoStudio.html?content=${DETAIL.id}`;
+
+  const rev = activeRev();
+  const prs = rev?.platforms || [];
+  CUR = reset || !CUR ? (prs[0] || null) : (prs.find(p => p.platform_revision_id === CUR.platform_revision_id) || prs[0]);
+
+  // profile 不在内容详情里，单独取一次做规格展示。
+  // 注意：GET /profiles 的 latest 是 id 字符串，完整规格在 versions[] 里。
+  if (prs.length) {
+    try {
+      const pf = await api.get("/profiles");
+      for (const pr of prs) {
+        const wanted = pr.profile_version_id || pf.latest?.[pr.platform];
+        const pv = (pf.versions || []).find(v => v.id === wanted);
+        if (pv) pr.profile = pv;
+      }
+    } catch (e) { /* 规格读不到不影响预览 */ }
+  }
+
+  const pubs = await api.get("/publications").catch(() => ({ items: [] }));
+  PUB_BY_PR = {};
+  for (const p of pubs.items || []) PUB_BY_PR[p.platform_revision_id] = p;
+
+  renderAll();
+}
+
+const loadWrapped = guard(() => load(true));
+
+await guard(async()=>{
+  const options=await api.get('/studio/options');
+  document.getElementById('revision-template').innerHTML='<option value="">保留当前模板</option>'+(options.templates||[]).map(t=>`<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('');
+})();
+
+document.getElementById("status").innerHTML = await statusBar();
+
+const contents = await api.get("/contents").catch(() => ({ items: [] }));
+const sel = document.getElementById("sel-content");
+sel.innerHTML = (contents.items || []).map(c =>
+  `<option value="${esc(c.id)}">${esc(c.display_id)} · ${esc(truncate(c.topic, 30))}（${esc(c.state)}）</option>`).join("");
+if (!(contents.items || []).length) {
+  sel.innerHTML = '<option value="">还没有内容，先去工作台「一键出成品」</option>';
+}
+
+const requestedContent = new URLSearchParams(location.search).get("content");
+if (requestedContent && [...sel.options].some(o => o.value === requestedContent)) sel.value = requestedContent;
+await loadWrapped();
+if (DETAIL && DETAIL.run_mode !== 'real') document.getElementById('illustrate-mode').value = 'local_seed';
+const requestedRun = new URLSearchParams(location.search).get('run');
+if (requestedRun && DETAIL) watchIllustration(requestedRun, DETAIL.id);
+log("页面就绪。图片走 GET /api/v1/platform-revisions/{pr}/pages/{n}，决策走 POST /review-decisions。");
+log("approve 必须匹配当前 manifest_hash；manifest 变更后旧批准自动失效。");
+</script>
+</body>
+</html>

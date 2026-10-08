@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>内容工作台 · 创作室</title>
+<link rel="stylesheet" href="/assets/app.css?v=20261005">
+<link rel="stylesheet" href="/assets/direct-creator.css?v=20261005">
+<link rel="stylesheet" href="/assets/workbench.css?v=20261006-source-filters">
+</head>
+<body class="studio-page">
+<nav class="nav" id="nav"></nav>
+<main class="wrap">
+  <header class="page-intro"><div><p class="eyebrow">CREATIVE STUDIO / 创作室</p><h1>下一篇，从一个想法开始。</h1><p class="sub">选好题，定好样式。剩下的交给你的创作搭档。</p></div><button data-start-guide class="quiet-button">带我操作一遍 ↗</button></header>
+  <nav class="workspace-tabs" role="tablist" aria-label="创作室功能">
+    <button id="tab-create" role="tab" aria-selected="true" aria-controls="pane-create" data-pane="create">新建创作</button>
+    <button id="tab-library" role="tab" aria-selected="false" aria-controls="pane-library" tabindex="-1" data-pane="library">我的内容 <span id="library-count"></span></button>
+    <button id="tab-tasks" role="tab" aria-selected="false" aria-controls="pane-tasks" tabindex="-1" data-pane="tasks">制作任务 <span id="task-count"></span></button>
+    <button id="tab-tools" role="tab" aria-selected="false" aria-controls="pane-tools" tabindex="-1" data-pane="tools">高级工具</button>
+  </nav>
+  <section id="pane-create" role="tabpanel" aria-labelledby="tab-create">
+    <div class="studio-layout">
+    <section class="creator" aria-label="分步创作">
+      <header class="creator-head"><span class="eyebrow">一篇内容 · 三个步骤</span><span id="creator-model" class="creator-status"><span class="spin"></span> 读取创作设置</span></header>
+      <nav class="wizard-steps" aria-label="创作步骤"><button data-wizard-step="0" aria-current="step"><span>01</span>确定选题</button><button data-wizard-step="1"><span>02</span>选择样式</button><button data-wizard-step="2"><span>03</span>确认制作</button></nav>
+      <fieldset id="creator-ready" disabled>
+        <div id="creator-compose" class="creator-compose">
+          <section data-wizard-panel="0" class="wizard-panel" aria-labelledby="topic-heading">
+            <h2 id="topic-heading" tabindex="-1">先选一个起点。</h2><p class="step-description">从排行榜里选题，或者自定义一个选题。选定后，再决定内容样式。</p>
+            <nav class="topic-source-choices" id="topic-source-choices" aria-label="选题起点"><button type="button" data-creator-tab="hot" aria-pressed="false" aria-label="排行榜选题"><strong>排行榜选题</strong><span>先看各来源的榜单，点选感兴趣的题目。</span><small>浏览排行榜 ↗</small></button><button type="button" data-creator-tab="manual" aria-pressed="false" aria-label="自定义选题"><strong>自定义选题</strong><span>已经有方向？直接输入你想做的选题。</span><small>输入自己的选题 ↗</small></button></nav>
+            <div id="creator-board" class="creator-board" hidden>
+              <div class="board-controls" id="board-categories"></div><div class="actions"><button id="board-refresh">刷新来源</button><a href="https://github.com/JackyST0/hotpush" target="_blank" rel="noopener">HotPush 来源 ↗</a></div>
+              <p id="board-state" class="creator-source-note" role="status"></p>
+              <details class="creator-materials" hidden><summary>热点服务设置</summary><label for="hotpush-base">聚合服务地址</label><input id="hotpush-base" type="url" placeholder="https://hotpush.dawenzaist.de5.net"><button id="hotpush-save">保存并读取</button></details>
+              <div class="board-columns" id="board-columns"></div>
+            </div>
+            <div id="creator-topic-form" hidden><label for="creator-topic" class="field-label">你的选题 <span>必填</span></label>
+            <textarea id="creator-topic" class="creator-topic" maxlength="300" rows="3" aria-describedby="topic-help creator-error" placeholder="例如：给刚入职的新人，做一份开会不慌张的准备清单。"></textarea>
+            <p id="topic-help" class="hint">尽量说清楚给谁看、讲什么。指定的数量、页数和时间范围会保留。</p>
+            <details class="creator-materials"><summary>补充要求、参考资料与配图 <span>选填</span></summary>
+              <label for="creator-requirements">特别想强调什么？</label><textarea id="creator-requirements" maxlength="3000" rows="2" placeholder="例如：语气轻松一点，给出可以直接照做的例子。"></textarea>
+              <label for="creator-materials">参考资料与来源</label><textarea id="creator-materials" maxlength="16000" rows="3" placeholder="粘贴原始资料、数据或链接，帮助核验内容。"></textarea>
+              <label for="creator-images">自己的配图（最多 6 张）</label><input id="creator-images" type="file" accept="image/png,image/jpeg" multiple><div class="actions creator-upload" id="creator-upload"></div>
+            </details></div>
+          </section>
+          <section data-wizard-panel="1" class="wizard-panel" hidden aria-labelledby="style-heading">
+            <h2 id="style-heading" tabindex="-1">让内容，有你的风格。</h2><p class="step-description">先选版式，再决定读起来的感觉。拿不准就用自动匹配。</p>
+            <div id="creator-templates" class="creator-template-grid" role="group" aria-label="内容模板"><div class="skeleton template-skeleton"></div><div class="skeleton template-skeleton"></div><div class="skeleton template-skeleton"></div></div>
+            <p class="hint">每套样式包含写作 Skill 与配套版式。<a href="/views/TemplateLibrary.html" target="_blank" rel="noopener">编辑规则与外观 / 搭建新模板 ↗</a></p>
+            <div class="creator-options"><fieldset><legend>信息密度</legend><label><input type="radio" name="creator-density" value="short">精简</label><label><input type="radio" name="creator-density" value="balanced" checked>均衡</label><label><input type="radio" name="creator-density" value="detailed">详细</label></fieldset>
+            <fieldset><legend>表达风格</legend><label><input type="radio" name="creator-style" value="clean" checked>简洁精致</label><label><input type="radio" name="creator-style" value="lively">活跃生动</label><label><input type="radio" name="creator-style" value="professional">专业克制</label></fieldset></div>
+            <div class="style-fields"><div><label for="creator-pages">内容页数（含封面）</label><select id="creator-pages"><option value="">自动决定</option><option value="1">1 页</option><option value="2" selected>2 页</option><option value="3">3 页</option><option value="4">4 页</option><option value="6">6 页</option></select></div><div><label for="creator-direction">题材方向</label><select id="creator-direction" aria-describedby="creator-skill-note"><option value="auto">自动识别</option></select></div></div>
+            <p class="hint" id="creator-skill-note">题材技能会帮助调研、组织内容并检查要求。<a href="/views/SkillWorkflow.html">管理创作技能 ↗</a></p>
+          </section>
+          <section data-wizard-panel="2" class="wizard-panel" hidden aria-labelledby="confirm-heading">
+            <h2 id="confirm-heading" tabindex="-1">准备好，把想法做出来。</h2><p class="step-description">核对这一篇的设置。生成后还能继续改稿与调整版式。</p>
+            <div class="creation-review" id="creation-review"></div>
+            <fieldset class="platform-choice"><legend>生成到哪些平台？</legend><label><input type="checkbox" name="creator-platform" value="douyin" checked>抖音</label><label><input type="checkbox" name="creator-platform" value="xiaohongshu" checked>小红书</label></fieldset>
+            <div class="call-notice"><span data-icon="sparkle"></span><p id="creator-call-note">正在核对模型与运行模式…</p></div>
+          </section>
+          <div class="creator-error" id="creator-error" role="alert"></div>
+          <footer class="wizard-footer" hidden><button id="wizard-back" hidden>← 上一步</button><span id="draft-note" role="status">草稿会保存在这台浏览器</span><button id="wizard-next" class="primary">下一步 · 选择样式 →</button><button class="primary" id="creator-start" hidden>确认并开始制作 →</button></footer>
+        </div>
+        <div class="creator-task" id="creator-task" hidden aria-live="polite"><p class="eyebrow">制作进度</p><h2 id="creator-task-title"></h2><p id="creator-task-note"></p><div id="creator-task-stages"></div><div class="actions"><a class="btn primary" id="creator-preview" hidden>打开成品，预览与调整 →</a><a class="btn" href="/views/Attention.html">处理任务问题</a><button id="creator-new">写下一篇</button><button id="creator-inspect">查看本次设置</button></div></div>
+      </fieldset>
+    </section>
+    <aside class="creation-aside"><div class="brief-header"><span class="eyebrow">YOUR BRIEF</span><span class="brief-dot"></span></div><h2>这一次的创作</h2><p id="brief-topic">一个想法，就是开始。</p><dl id="brief-settings"></dl><div class="aside-divider"></div><span class="eyebrow" id="aside-step">01 / 确定选题</span><h3 id="aside-title">越具体，越接近你想要的。</h3><p id="aside-help">题目里可以带上受众、数量或时间。你的原题会一直保留到成品。</p><div id="creator-contract" class="creator-contract"></div><a href="/views/ReviewPreview.html" class="aside-link">先看看已有成品 ↗</a></aside>
+    </div>
+  </section>
+  <section id="pane-library" role="tabpanel" aria-labelledby="tab-library" hidden>
+    <div class="pane-heading"><div><h2>所有想法，都有迹可循。</h2><p>打开成品继续调整，或找到还没完成的内容。</p></div><button id="btn-refresh">刷新内容</button></div>
+    <div class="library-filters"><label for="library-search" class="sr-only">搜索内容</label><input id="library-search" type="search" placeholder="搜索选题或编号…"><label for="library-filter" class="sr-only">内容状态</label><select id="library-filter"><option value="all">全部状态</option><option value="review">待预览</option><option value="approved">已批准</option><option value="working">制作中 / 需处理</option></select></div>
+    <div class="library-selection-bar" role="group" aria-label="批量清理内容"><span id="library-selection-count" role="status">已选 0 条</span><button id="library-select-matching" hidden>选择全部筛选结果</button><button id="library-clear-selection" disabled>清空选择</button><button id="library-bulk-discard" class="danger" disabled>批量清理</button><small>切换搜索或状态会清空选择</small></div>
+    <p id="library-cleanup-note" class="hint" role="status"></p><p id="refresh-note" class="hint" role="status"></p>
+    <div class="panel library-table"><table><thead><tr><th><input id="library-select-all" type="checkbox" aria-label="全选当前显示的内容" disabled></th><th>编号</th><th>选题</th><th>状态</th><th>来源</th><th>平台稿</th><th>操作</th></tr></thead><tbody id="contents"></tbody></table></div>
+    <div class="list-footer"><span id="library-pagination"></span><button id="library-more" hidden>加载更多内容</button></div>
+  </section>
+  <section id="pane-tasks" role="tabpanel" aria-labelledby="tab-tasks" hidden><div class="pane-heading"><div><h2>制作到哪一步了？</h2><p>这里查看进度、暂停任务或修复后继续。制作中的任务自动更新。</p></div><button id="tasks-refresh">刷新任务</button></div><p id="tasks-note" class="hint" role="status"></p><div id="runs" class="task-list"></div><div class="list-footer"><button id="tasks-more" hidden>加载更早任务</button></div></section>
+  <section id="pane-tools" role="tabpanel" aria-labelledby="tab-tools" hidden><div id="tools-content"></div></section>
+</main>
+<script type="module" src="/assets/production.js?v=20261006-submission"></script>
+</body></html>

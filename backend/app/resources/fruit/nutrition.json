@@ -1,0 +1,93 @@
+{
+  "version": "usda-sr-legacy-2018-fruit-v1",
+  "scope": "生鲜、每100克可食部；美国通用品种样本，非中国具体品种实测。图片为品类示意，非营养检测样本。",
+  "dataset_url": "https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_%202019-04-02.zip",
+  "dataset_sha256": "541b56ee704e1ba7b48d9ef06683f817ef941da7a3f5e5888858b58f57b1fda3",
+  "retrieved_at": "2026-10-04",
+  "fruits": [
+    {
+      "id": "kiwi",
+      "name": "绿肉猕猴桃",
+      "description": "Kiwifruit, green, raw",
+      "fdc_id": 168153,
+      "nutrients": {
+        "fiber_g": 3.0,
+        "vitamin_c_mg": 92.7,
+        "water_g": 83.07,
+        "sugars_g": 8.99,
+        "carbohydrate_g": 14.66,
+        "energy_kcal": 61.0
+      }
+    },
+    {
+      "id": "orange",
+      "name": "橙",
+      "description": "Oranges, raw, all commercial varieties",
+      "fdc_id": 169097,
+      "nutrients": {
+        "sugars_g": 9.35,
+        "carbohydrate_g": 11.75,
+        "energy_kcal": 47.0,
+        "water_g": 86.75,
+        "vitamin_c_mg": 53.2,
+        "fiber_g": 2.4
+      }
+    },
+    {
+      "id": "pear",
+      "name": "梨",
+      "description": "Pears, raw",
+      "fdc_id": 169118,
+      "nutrients": {
+        "carbohydrate_g": 15.23,
+        "energy_kcal": 57.0,
+        "water_g": 83.96,
+        "sugars_g": 9.75,
+        "vitamin_c_mg": 4.3,
+        "fiber_g": 3.1
+      }
+    },
+    {
+      "id": "persimmon",
+      "name": "柿子",
+      "description": "Persimmons, japanese, raw",
+      "fdc_id": 169941,
+      "nutrients": {
+        "sugars_g": 12.53,
+        "fiber_g": 3.6,
+        "vitamin_c_mg": 7.5,
+        "carbohydrate_g": 18.59,
+        "energy_kcal": 70.0,
+        "water_g": 80.32
+      }
+    },
+    {
+      "id": "grape",
+      "name": "葡萄",
+      "description": "Grapes, red or green (European type, such as Thompson seedless), raw",
+      "fdc_id": 174683,
+      "nutrients": {
+        "water_g": 80.54,
+        "sugars_g": 15.48,
+        "fiber_g": 0.9,
+        "carbohydrate_g": 18.1,
+        "energy_kcal": 69.0,
+        "vitamin_c_mg": 3.2
+      }
+    },
+    {
+      "id": "apple",
+      "name": "苹果",
+      "description": "Apples, raw, with skin (Includes foods for USDA's Food Distribution Program)",
+      "fdc_id": 171688,
+      "nutrients": {
+        "carbohydrate_g": 13.81,
+        "energy_kcal": 52.0,
+        "sugars_g": 10.39,
+        "water_g": 85.56,
+        "fiber_g": 2.4,
+        "vitamin_c_mg": 4.6
+      }
+    }
+  ]
+}

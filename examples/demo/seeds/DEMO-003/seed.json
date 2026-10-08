@@ -1,0 +1,295 @@
+{
+  "schema_version": "seed-c001-v1",
+  "display_id": "DEMO-003",
+  "dataset_kind": "fixture",
+  "run_mode": "fixture",
+  "topic": "【演示】成品审批与版本留存",
+  "content_state": "draft",
+  "media_ready": false,
+  "api_generated_in_app": false,
+  "publication_state": "not_published",
+  "review_decision": null,
+  "brief": {
+    "audience": "希望减少内容制作工作量的个人创作者",
+    "objective": "记录一次图文工作流的设计和后续试验，不预设效果",
+    "voice": "直接、具体、不夸大",
+    "format": "carousel",
+    "production_constraints": [
+      "无需用户预先提供成品或录屏",
+      "文字使用排版层绘制，首版无需生图服务",
+      "方案与目标不可叙述为已经完成的自动化",
+      "只有最终成品进入人工集中预览",
+      "每页信息量需撑住整版，单页正文不少于 60 字（约 4-5 条）"
+    ]
+  },
+  "sources": [
+    {
+      "id": "S01",
+      "kind": "local_planning_document",
+      "path": "../../source-notes.md",
+      "locator": "DEMO-003",
+      "access_state": "ok",
+      "excerpt_basis": "local_file",
+      "excerpt": "## DEMO-003\n文案与图片绑定同一版本\n逐平台预览最终页图\n修改要求保留原稿历史\n新图片需要重新批准\n导出清单记录文件指纹",
+      "supports": "演示工作流的设计说明",
+      "limitations": "工程示例，不是实际运营结论"
+    }
+  ],
+  "claims": [
+    {
+      "id": "C01",
+      "kind": "project_plan",
+      "statement": "文案与图片绑定同一版本",
+      "source_ids": [
+        "S01"
+      ]
+    },
+    {
+      "id": "C02",
+      "kind": "project_plan",
+      "statement": "逐平台预览最终页图",
+      "source_ids": [
+        "S01"
+      ]
+    },
+    {
+      "id": "C03",
+      "kind": "project_plan",
+      "statement": "修改要求保留原稿历史",
+      "source_ids": [
+        "S01"
+      ]
+    },
+    {
+      "id": "C04",
+      "kind": "project_plan",
+      "statement": "新图片需要重新批准",
+      "source_ids": [
+        "S01"
+      ]
+    },
+    {
+      "id": "C05",
+      "kind": "project_plan",
+      "statement": "导出清单记录文件指纹",
+      "source_ids": [
+        "S01"
+      ]
+    }
+  ],
+  "render_profile": {
+    "name": "editorial-development-default",
+    "version": "1",
+    "width_px": 1080,
+    "height_px": 1440,
+    "format": "png",
+    "platform_upload_verified": false,
+    "note": "仅为便于开发的可调整排版值，不是平台官方规格或上传兼容性证明"
+  },
+  "platform_drafts": [
+    {
+      "platform": "douyin",
+      "title": "成品审批与版本留存",
+      "caption": "【演示样本】文案与图片绑定同一版本；逐平台预览最终页图；修改要求保留原稿历史；新图片需要重新批准；导出清单记录文件指纹。这些内容用于检查工程流程。",
+      "pages": [
+        {
+          "index": 1,
+          "layout": "cover",
+          "heading": "成品审批与版本留存",
+          "kicker": "演示样本",
+          "body": [
+            "文案与图片绑定同一版本",
+            "保留步骤输入与结果，便于后续检查。",
+            "遇到不完整材料时明确记录原因。",
+            "通过最终成品检查后继续下一步。"
+          ],
+          "footnote": "离线演示，未真实发布。",
+          "claim_ids": [
+            "C01"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 2,
+          "layout": "checklist",
+          "heading": "逐平台预览最终页图",
+          "kicker": "演示样本",
+          "body": [
+            "逐平台预览最终页图",
+            "保留步骤输入与结果，便于后续检查。",
+            "遇到不完整材料时明确记录原因。",
+            "通过最终成品检查后继续下一步。"
+          ],
+          "footnote": "离线演示，未真实发布。",
+          "claim_ids": [
+            "C02"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 3,
+          "layout": "checklist",
+          "heading": "修改要求保留原稿历史",
+          "kicker": "演示样本",
+          "body": [
+            "修改要求保留原稿历史",
+            "保留步骤输入与结果，便于后续检查。",
+            "遇到不完整材料时明确记录原因。",
+            "通过最终成品检查后继续下一步。"
+          ],
+          "footnote": "离线演示，未真实发布。",
+          "claim_ids": [
+            "C03"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 4,
+          "layout": "checklist",
+          "heading": "新图片需要重新批准",
+          "kicker": "演示样本",
+          "body": [
+            "新图片需要重新批准",
+            "保留步骤输入与结果，便于后续检查。",
+            "遇到不完整材料时明确记录原因。",
+            "通过最终成品检查后继续下一步。"
+          ],
+          "footnote": "离线演示，未真实发布。",
+          "claim_ids": [
+            "C04"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 5,
+          "layout": "checklist",
+          "heading": "导出清单记录文件指纹",
+          "kicker": "演示样本",
+          "body": [
+            "导出清单记录文件指纹",
+            "保留步骤输入与结果，便于后续检查。",
+            "遇到不完整材料时明确记录原因。",
+            "通过最终成品检查后继续下一步。"
+          ],
+          "footnote": "离线演示，未真实发布。",
+          "claim_ids": [
+            "C05"
+          ],
+          "asset_ids": []
+        }
+      ]
+    },
+    {
+      "platform": "xiaohongshu",
+      "title": "成品审批与版本留存",
+      "caption": "【演示样本】文案与图片绑定同一版本；逐平台预览最终页图；修改要求保留原稿历史；新图片需要重新批准；导出清单记录文件指纹。这些内容用于检查工程流程。",
+      "pages": [
+        {
+          "index": 1,
+          "layout": "cover",
+          "heading": "成品审批与版本留存",
+          "kicker": "演示样本",
+          "body": [
+            "文案与图片绑定同一版本",
+            "保留步骤输入与结果，便于后续检查。",
+            "遇到不完整材料时明确记录原因。",
+            "通过最终成品检查后继续下一步。"
+          ],
+          "footnote": "离线演示，未真实发布。",
+          "claim_ids": [
+            "C01"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 2,
+          "layout": "checklist",
+          "heading": "逐平台预览最终页图",
+          "kicker": "演示样本",
+          "body": [
+            "逐平台预览最终页图",
+            "保留步骤输入与结果，便于后续检查。",
+            "遇到不完整材料时明确记录原因。",
+            "通过最终成品检查后继续下一步。"
+          ],
+          "footnote": "离线演示，未真实发布。",
+          "claim_ids": [
+            "C02"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 3,
+          "layout": "checklist",
+          "heading": "修改要求保留原稿历史",
+          "kicker": "演示样本",
+          "body": [
+            "修改要求保留原稿历史",
+            "保留步骤输入与结果，便于后续检查。",
+            "遇到不完整材料时明确记录原因。",
+            "通过最终成品检查后继续下一步。"
+          ],
+          "footnote": "离线演示，未真实发布。",
+          "claim_ids": [
+            "C03"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 4,
+          "layout": "checklist",
+          "heading": "新图片需要重新批准",
+          "kicker": "演示样本",
+          "body": [
+            "新图片需要重新批准",
+            "保留步骤输入与结果，便于后续检查。",
+            "遇到不完整材料时明确记录原因。",
+            "通过最终成品检查后继续下一步。"
+          ],
+          "footnote": "离线演示，未真实发布。",
+          "claim_ids": [
+            "C04"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 5,
+          "layout": "checklist",
+          "heading": "导出清单记录文件指纹",
+          "kicker": "演示样本",
+          "body": [
+            "导出清单记录文件指纹",
+            "保留步骤输入与结果，便于后续检查。",
+            "遇到不完整材料时明确记录原因。",
+            "通过最终成品检查后继续下一步。"
+          ],
+          "footnote": "离线演示，未真实发布。",
+          "claim_ids": [
+            "C05"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 6,
+          "layout": "checklist",
+          "heading": "文案与图片绑定同一版本",
+          "kicker": "演示样本",
+          "body": [
+            "文案与图片绑定同一版本",
+            "保留步骤输入与结果，便于后续检查。",
+            "遇到不完整材料时明确记录原因。",
+            "通过最终成品检查后继续下一步。"
+          ],
+          "footnote": "离线演示，未真实发布。",
+          "claim_ids": [
+            "C01"
+          ],
+          "asset_ids": []
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "全部为离线演示样本；发布链接、指标和评论为虚构数据。"
+  ]
+}

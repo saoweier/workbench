@@ -1,0 +1,104 @@
+{
+  "schema_version": "1",
+  "notice": "用户说法 → 预期路由与交付物。用于检查 Skill 的入口说明是否与真实路由一致：每个用例都断言题材形态、题材方向、数量约束、冻结的样式模板，以及这次任务应该交出的交付物。用例不是提示词，是程序判定的契约；断言失败说明入口说明与实现走偏了。",
+  "deliverable_keys": ["sources", "screening", "copy", "visual", "images", "copy_text", "acceptance"],
+  "cases": [
+    {
+      "id": "ranking-tech",
+      "request": "上个月GitHub最热门Skill TOP10，精致排行榜1～2页",
+      "expect": {
+        "stage_entry": "planning",
+        "form": "ranking",
+        "direction": "tech",
+        "rank_count": 10,
+        "page_budget": [1, 2],
+        "template_id": "rank_cards",
+        "acceptance": "rank",
+        "deliverable_keys": ["sources", "screening", "copy", "visual", "images", "copy_text", "acceptance"],
+        "note": "榜单是唯一有专项验收契约的形态：条目数、名次顺序、指标对应项目都必须由程序核对。"
+      }
+    },
+    {
+      "id": "ranking-life-one-page",
+      "request": "水果TOP10排行榜1页",
+      "expect": {
+        "stage_entry": "planning",
+        "form": "ranking",
+        "direction": "life",
+        "rank_count": 10,
+        "page_budget": [1, 1],
+        "template_id": "rank_cards",
+        "acceptance": "rank",
+        "deliverable_keys": ["sources", "screening", "copy", "visual", "images", "copy_text", "acceptance"],
+        "note": "单页榜单：该页即完整名次，不再额外做封面（抖音尤其如此）。"
+      }
+    },
+    {
+      "id": "listicle-tools",
+      "request": "五个必备的AI写作工具盘点",
+      "expect": {
+        "stage_entry": "planning",
+        "form": "listicle",
+        "direction": "tech",
+        "item_count": 5,
+        "rank_count": 5,
+        "template_id": "illustrated",
+        "acceptance": "export",
+        "deliverable_keys": ["sources", "screening", "copy", "visual", "images", "copy_text", "acceptance"],
+        "note": "清单盘点的条目数是硬约束，不能增减对象。"
+      }
+    },
+    {
+      "id": "comparison-two-options",
+      "request": "A和B怎么选：两种方案对比",
+      "expect": {
+        "stage_entry": "planning",
+        "form": "comparison",
+        "direction": "general",
+        "template_id": "illustrated",
+        "acceptance": "export",
+        "deliverable_keys": ["sources", "screening", "copy", "visual", "images", "copy_text", "acceptance"],
+        "note": "对比形态按对照组织页面，不套用榜单的名次版面。"
+      }
+    },
+    {
+      "id": "explainer-concept",
+      "request": "什么是向量数据库",
+      "expect": {
+        "stage_entry": "planning",
+        "form": "explainer",
+        "direction": "general",
+        "template_id": "illustrated",
+        "acceptance": "export",
+        "deliverable_keys": ["sources", "screening", "copy", "visual", "images", "copy_text", "acceptance"],
+        "note": "纯解释题不设数量约束，按框架排页。"
+      }
+    },
+    {
+      "id": "explainer-games",
+      "request": "游戏《空洞骑士》新手攻略",
+      "expect": {
+        "stage_entry": "research",
+        "form": "explainer",
+        "direction": "games",
+        "template_id": "illustrated",
+        "acceptance": "export",
+        "deliverable_keys": ["sources", "screening", "copy", "visual", "images", "copy_text", "acceptance"],
+        "note": "攻略类题先在「资料调研与核验」取原文，再进入规划。"
+      }
+    },
+    {
+      "id": "ranking-needs-real-data-without-search",
+      "request": "热榜TOP10排行榜，按真实热度排序",
+      "expect": {
+        "stage_entry": "planning",
+        "form": "ranking",
+        "rank_count": 10,
+        "acceptance": "rank",
+        "blocking_stage": "planning",
+        "deliverable_keys": ["sources", "screening", "copy", "visual", "images", "copy_text", "acceptance"],
+        "note": "未配置搜索服务时需要真实热度的榜单会在规划被防编造闸门拦下，这是设计行为：不编造排行，也不假装已经搜索。"
+      }
+    }
+  ]
+}

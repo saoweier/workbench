@@ -1,0 +1,19 @@
+{
+  "version": "fruit-ai-atlas-v1",
+  "type": "ai_generated_illustration",
+  "disclosure": "AI写实示意图，非实拍、非营养检测样本",
+  "sha256": "bc4e2ea4d6fe21eb88a1f290cd4547644f0481c2396991d1cce5c015a1ea69bb",
+  "width": 1254,
+  "height": 1254,
+  "columns": 3,
+  "rows": 2,
+  "ids": [
+    "apple",
+    "pear",
+    "orange",
+    "kiwi",
+    "grape",
+    "persimmon"
+  ],
+  "created_at": "2026-10-04"
+}

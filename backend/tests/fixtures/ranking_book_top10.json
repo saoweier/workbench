@@ -1,0 +1,188 @@
+{
+  "index": 1,
+  "layout": "cover",
+  "heading": "HotPush豆瓣新书榜TOP10",
+  "kicker": "完整名次",
+  "body": [
+    "按HotPush聚合返回顺序排列，非评分销量"
+  ],
+  "footnote": "来源：HotPush聚合快照，2026-10-06抓取",
+  "claim_ids": [
+    "C01",
+    "C02"
+  ],
+  "visual": {
+    "kind": "rank",
+    "title": "HotPush豆瓣新书榜TOP10",
+    "items": [
+      {
+        "label": "经学导论",
+        "detail": "马楠著，系统梳理中国传统经学发展的著作",
+        "icon": "page",
+        "category": "新书",
+        "tags": [
+          "经学",
+          "传统",
+          "学术"
+        ],
+        "metric_text": null,
+        "metric_label": null,
+        "metric_source_id": null,
+        "rank": 1
+      },
+      {
+        "label": "隐蔽嫌疑人",
+        "detail": "陈浩基著，衣橱玻璃瓶人体标本悬案",
+        "icon": "search",
+        "category": "新书",
+        "tags": [
+          "悬疑",
+          "推理",
+          "命案"
+        ],
+        "metric_text": null,
+        "metric_label": null,
+        "metric_source_id": null,
+        "rank": 2
+      },
+      {
+        "label": "盖特伍德奶奶去徒步",
+        "detail": "67岁孤身徒步3300公里阿巴拉契亚小径",
+        "icon": "globe",
+        "category": "新书",
+        "tags": [
+          "徒步",
+          "纪实",
+          "女性"
+        ],
+        "metric_text": null,
+        "metric_label": null,
+        "metric_source_id": null,
+        "rank": 3
+      },
+      {
+        "label": "蒙古帝国的阴影下",
+        "detail": "明初如何直面并重塑蒙古统治的记忆遗产",
+        "icon": "brain",
+        "category": "新书",
+        "tags": [
+          "历史",
+          "明初",
+          "记忆"
+        ],
+        "metric_text": null,
+        "metric_label": null,
+        "metric_source_id": null,
+        "rank": 4
+      },
+      {
+        "label": "一个人的博物馆",
+        "detail": "跨学科解析博物馆如何成为巴黎文化DNA",
+        "icon": "palette",
+        "category": "新书",
+        "tags": [
+          "艺术",
+          "巴黎",
+          "文化"
+        ],
+        "metric_text": null,
+        "metric_label": null,
+        "metric_source_id": null,
+        "rank": 5
+      },
+      {
+        "label": "电影的色彩",
+        "detail": "选取50部里程碑影片拆解电影配色方案",
+        "icon": "palette",
+        "category": "新书",
+        "tags": [
+          "电影",
+          "色彩",
+          "影史"
+        ],
+        "metric_text": null,
+        "metric_label": null,
+        "metric_source_id": null,
+        "rank": 6
+      },
+      {
+        "label": "衣裳哲学",
+        "detail": "英国编辑被德国教授衣裳哲学吸引并推介",
+        "icon": "idea",
+        "category": "新书",
+        "tags": [
+          "哲学",
+          "随笔",
+          "思想"
+        ],
+        "metric_text": null,
+        "metric_label": null,
+        "metric_source_id": null,
+        "rank": 7
+      },
+      {
+        "label": "给予的力量",
+        "detail": "年轻职员为拿订单求助，越努力越疲惫",
+        "icon": "briefcase",
+        "category": "新书",
+        "tags": [
+          "成长",
+          "职场",
+          "寓言"
+        ],
+        "metric_text": null,
+        "metric_label": null,
+        "metric_source_id": null,
+        "rank": 8
+      },
+      {
+        "label": "明月白雪照着大地",
+        "detail": "95后作家首部小说集，穿行城市与荒野",
+        "icon": "pencil",
+        "category": "新书",
+        "tags": [
+          "小说集",
+          "年轻",
+          "游走"
+        ],
+        "metric_text": null,
+        "metric_label": null,
+        "metric_source_id": null,
+        "rank": 9
+      },
+      {
+        "label": "伊卡洛斯的飞行",
+        "detail": "Netflix剧集主创撰写官方认证正史故事",
+        "icon": "game",
+        "category": "新书",
+        "tags": [
+          "剧集",
+          "正史",
+          "官方"
+        ],
+        "metric_text": null,
+        "metric_label": null,
+        "metric_source_id": null,
+        "rank": 10
+      }
+    ],
+    "takeaway": "名次只是聚合返回顺序，选书看简介别当评分榜",
+    "presentation": "rank_cards",
+    "presentation_version": 3,
+    "template_style": {
+      "background": "#ffdd68",
+      "ink": "#18213b",
+      "accent": "#173ca2",
+      "soft": "#fff4cc",
+      "heading_size": 68,
+      "body_size": 29,
+      "row_spacing": 14,
+      "radius": 18,
+      "heading_font": "display",
+      "decoration": "rich",
+      "design_family": "collage"
+    },
+    "template_package_id": "rank_cards",
+    "template_package_version": "aa486b1b052046d2"
+  }
+}

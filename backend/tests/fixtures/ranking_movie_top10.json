@@ -1,0 +1,216 @@
+[
+  {
+    "index": 1,
+    "layout": "cover",
+    "heading": "HotPush热映作品TOP10",
+    "kicker": "完整名次",
+    "body": [
+      "按HotPush聚合返回顺序，非评分排名"
+    ],
+    "footnote": "据用户提供的HotPush快照；片名、片长、主创未独立核验",
+    "claim_ids": [
+      "C01"
+    ],
+    "visual": {
+      "kind": "rank",
+      "title": "HotPush热映作品TOP10",
+      "items": [
+        {
+          "label": "1 生化危机：爆发夜",
+          "detail": "生化危机系列新作，主打爆发生存惊险。",
+          "icon": "game",
+          "category": "电影",
+          "tags": [
+            "生存惊险",
+            "系列新作"
+          ],
+          "metric_text": null,
+          "metric_label": null,
+          "metric_source_id": null,
+          "rank": 1
+        },
+        {
+          "label": "2 神探之痕迹‎",
+          "detail": "悬疑探案题材，靠推理线索推进。",
+          "icon": "search",
+          "category": "电影",
+          "tags": [
+            "悬疑探案",
+            "推理线索"
+          ],
+          "metric_text": null,
+          "metric_label": null,
+          "metric_source_id": null,
+          "rank": 2
+        },
+        {
+          "label": "3 重生2",
+          "detail": "系列续作，延续前作人物与故事线。",
+          "icon": "page",
+          "category": "电影",
+          "tags": [
+            "系列续作",
+            "人物延续"
+          ],
+          "metric_text": null,
+          "metric_label": null,
+          "metric_source_id": null,
+          "rank": 3
+        },
+        {
+          "label": "4 什么意思夫妇",
+          "detail": "夫妻档喜剧，围绕日常误会展开。",
+          "icon": "idea",
+          "category": "电影",
+          "tags": [
+            "夫妻喜剧",
+            "日常误会"
+          ],
+          "metric_text": null,
+          "metric_label": null,
+          "metric_source_id": null,
+          "rank": 4
+        },
+        {
+          "label": "5 野兽之心",
+          "detail": "动作类型片，主打硬派对抗节奏。",
+          "icon": "game",
+          "category": "电影",
+          "tags": [
+            "动作类型",
+            "硬派对抗"
+          ],
+          "metric_text": null,
+          "metric_label": null,
+          "metric_source_id": null,
+          "rank": 5
+        }
+      ],
+      "takeaway": "顺序只是快照返回次序，看看片名和一句话再决定要不要追",
+      "presentation": "editorial",
+      "presentation_version": 3,
+      "template_style": {
+        "background": "#f8f5ed",
+        "ink": "#24211d",
+        "accent": "#a43024",
+        "soft": "#eae5dc",
+        "heading_size": 68,
+        "body_size": 29,
+        "row_spacing": 14,
+        "radius": 14,
+        "heading_font": "serif",
+        "decoration": "rich",
+        "design_family": "magazine"
+      },
+      "template_package_id": "editorial",
+      "template_package_version": "84ef0ca6fefb27fc"
+    }
+  },
+  {
+    "index": 2,
+    "layout": "checklist",
+    "heading": "HotPush热映作品TOP10",
+    "kicker": "完整名次",
+    "body": [
+      "按HotPush聚合返回顺序，非评分排名"
+    ],
+    "footnote": "据用户提供的HotPush快照；片名、片长、主创未独立核验",
+    "claim_ids": [
+      "C01"
+    ],
+    "visual": {
+      "kind": "rank",
+      "title": "HotPush热映作品TOP10",
+      "items": [
+        {
+          "label": "6 活色生香",
+          "detail": "都市女性群像故事，看人物关系与生活质感。",
+          "icon": "palette",
+          "category": "电影",
+          "tags": [
+            "女性群像",
+            "生活质感"
+          ],
+          "metric_text": null,
+          "metric_label": null,
+          "metric_source_id": null,
+          "rank": 6
+        },
+        {
+          "label": "7 侦战",
+          "detail": "警匪动作题材，节奏紧凑。",
+          "icon": "briefcase",
+          "category": "电影",
+          "tags": [
+            "警匪动作",
+            "节奏紧凑"
+          ],
+          "metric_text": null,
+          "metric_label": null,
+          "metric_source_id": null,
+          "rank": 7
+        },
+        {
+          "label": "8 杀死比尔：血色全传",
+          "detail": "经典作品加长合集，一次看完整故事。",
+          "icon": "game",
+          "category": "电影",
+          "tags": [
+            "经典合集",
+            "加长版"
+          ],
+          "metric_text": null,
+          "metric_label": null,
+          "metric_source_id": null,
+          "rank": 8
+        },
+        {
+          "label": "9 敦煌英雄",
+          "detail": "历史题材，围绕边塞人物与家国故事展开。",
+          "icon": "globe",
+          "category": "电影",
+          "tags": [
+            "历史题材",
+            "边塞家国"
+          ],
+          "metric_text": null,
+          "metric_label": null,
+          "metric_source_id": null,
+          "rank": 9
+        },
+        {
+          "label": "10 老江湖",
+          "detail": "黑色幽默江湖故事，看老手过招。",
+          "icon": "idea",
+          "category": "电影",
+          "tags": [
+            "黑色幽默",
+            "江湖过招"
+          ],
+          "metric_text": null,
+          "metric_label": null,
+          "metric_source_id": null,
+          "rank": 10
+        }
+      ],
+      "takeaway": "顺序只是快照返回次序，看看片名和一句话再决定要不要追",
+      "presentation": "editorial",
+      "presentation_version": 3,
+      "template_style": {
+        "background": "#f8f5ed",
+        "ink": "#24211d",
+        "accent": "#a43024",
+        "soft": "#eae5dc",
+        "heading_size": 68,
+        "body_size": 29,
+        "row_spacing": 14,
+        "radius": 14,
+        "heading_font": "serif",
+        "decoration": "rich",
+        "design_family": "magazine"
+      },
+      "template_package_id": "editorial",
+      "template_package_version": "84ef0ca6fefb27fc"
+    }
+  }
+]

@@ -1,0 +1,14 @@
+name: content-workbench-search
+services:
+  searxng:
+    image: docker.io/searxng/searxng@sha256:76b0bf285aca014c7191fc4d9234c4bfb358624ac33d8883833d496c059ec072
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8088:8080"
+    volumes:
+      - ../../storage/searxng/config:/etc/searxng
+      - searxng-data:/var/cache/searxng
+    environment:
+      SEARXNG_BASE_URL: http://127.0.0.1:8088/
+volumes:
+  searxng-data:

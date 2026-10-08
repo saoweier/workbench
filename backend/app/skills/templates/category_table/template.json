@@ -1,0 +1,21 @@
+{
+  "id": "category_table",
+  "name": "清晰数据图表",
+  "description": "蓝白档案、明确列头、分类栏与规整线条，适合参数、对照和速查",
+  "renderer": "category_table",
+  "version": 3,
+  "forms": [],
+  "style": {
+    "background": "#f5f9ff",
+    "ink": "#213652",
+    "accent": "#174778",
+    "soft": "#e4edf8",
+    "heading_size": 68,
+    "body_size": 29,
+    "row_spacing": 12,
+    "radius": 16,
+    "heading_font": "system",
+    "decoration": "rich",
+    "design_family": "data"
+  }
+}

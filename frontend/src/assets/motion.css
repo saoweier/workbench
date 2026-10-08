@@ -1,0 +1,5 @@
+:root { --duration-fast:160ms; --duration-normal:220ms; --ease-standard:cubic-bezier(.2,.7,.2,1); }
+button,a,input,select,textarea { transition:background var(--duration-fast),border-color var(--duration-fast),box-shadow var(--duration-fast),color var(--duration-fast); }
+.content-card,.entry-card { transition:transform var(--duration-normal) var(--ease-standard),box-shadow var(--duration-normal),border-color var(--duration-normal); }
+.content-card:hover,.entry-card:hover { transform:translateY(-2px); }
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important; scroll-behavior:auto !important; } }

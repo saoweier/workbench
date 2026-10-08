@@ -1,0 +1,29 @@
+use_default_settings:
+  engines:
+    keep_only:
+      - duckduckgo
+      - brave
+      - mojeek
+      - yahoo
+general:
+  instance_name: Content Workbench Search
+search:
+  formats:
+    - html
+    - json
+  default_lang: auto
+server:
+  secret_key: __GENERATED_SECRET__
+  limiter: false
+outgoing:
+  request_timeout: 10.0
+  max_request_timeout: 15.0
+engines:
+  - name: duckduckgo
+    disabled: false
+  - name: brave
+    disabled: false
+  - name: mojeek
+    disabled: false
+  - name: yahoo
+    disabled: false

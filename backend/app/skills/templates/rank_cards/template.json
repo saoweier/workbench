@@ -1,0 +1,21 @@
+{
+  "id": "rank_cards",
+  "name": "活力拼贴海报",
+  "description": "明黄底、剪纸色块、胶带、贴纸与错落大字，适合活泼清单和梗指南",
+  "renderer": "rank_cards",
+  "version": 3,
+  "forms": [],
+  "style": {
+    "background": "#ffdd68",
+    "ink": "#18213b",
+    "accent": "#173ca2",
+    "soft": "#fff4cc",
+    "heading_size": 68,
+    "body_size": 29,
+    "row_spacing": 14,
+    "radius": 18,
+    "heading_font": "display",
+    "decoration": "rich",
+    "design_family": "collage"
+  }
+}

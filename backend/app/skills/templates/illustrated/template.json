@@ -1,0 +1,21 @@
+{
+  "id": "illustrated",
+  "name": "深色科技图解",
+  "description": "深色工程网格、薄荷色线路、方形模块与轨道图案，适合流程与技术图解",
+  "renderer": "illustrated",
+  "version": 5,
+  "forms": [],
+  "style": {
+    "background": "#101e26",
+    "ink": "#e4f5ec",
+    "accent": "#a0efc6",
+    "soft": "#1b3039",
+    "heading_size": 68,
+    "body_size": 29,
+    "row_spacing": 20,
+    "radius": 24,
+    "heading_font": "mono",
+    "decoration": "rich",
+    "design_family": "neon"
+  }
+}

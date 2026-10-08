@@ -1,0 +1,238 @@
+[
+  {
+    "index": 1,
+    "layout": "cover",
+    "heading": "HotPush热映TOP10速查",
+    "kicker": "完整名次",
+    "body": [
+      "按HotPush聚合返回顺序"
+    ],
+    "footnote": "HotPush快照（豆瓣热映，2026-10-06）；缺剧情、票房与热度数据",
+    "claim_ids": [
+      "C01",
+      "C02",
+      "C03",
+      "C04",
+      "C05",
+      "C06",
+      "C07",
+      "C08",
+      "C09",
+      "C10",
+      "C11",
+      "C12"
+    ],
+    "visual": {
+      "kind": "rank",
+      "title": "HotPush热映TOP10速查",
+      "items": [
+        {
+          "label": "生化危机：爆发夜",
+          "detail": "片长94分钟｜德国、法国、美国｜奥斯汀·艾布拉姆斯、扎克·切利、卡莉·瑞斯",
+          "icon": "game",
+          "category": "片长·地区·主演",
+          "tags": [
+            "94分钟",
+            "德法美"
+          ],
+          "metric_text": "94分钟",
+          "metric_label": "片长",
+          "metric_source_id": "U01",
+          "rank": 1
+        },
+        {
+          "label": "神探之痕迹",
+          "detail": "片长140分钟｜中国大陆｜张译、马丽、陈明昊",
+          "icon": "search",
+          "category": "片长·地区·主演",
+          "tags": [
+            "140分钟",
+            "中国大陆"
+          ],
+          "metric_text": "140分钟",
+          "metric_label": "片长",
+          "metric_source_id": "U01",
+          "rank": 2
+        },
+        {
+          "label": "重生2",
+          "detail": "片长132分钟｜中国大陆｜梁洛施、文俊辉、洪金宝",
+          "icon": "page",
+          "category": "片长·地区·主演",
+          "tags": [
+            "132分钟",
+            "中国大陆"
+          ],
+          "metric_text": "132分钟",
+          "metric_label": "片长",
+          "metric_source_id": "U01",
+          "rank": 3
+        },
+        {
+          "label": "什么意思夫妇",
+          "detail": "片长106分钟｜中国大陆｜小沈阳、沈春阳、贾冰",
+          "icon": "question",
+          "category": "片长·地区·主演",
+          "tags": [
+            "106分钟",
+            "中国大陆"
+          ],
+          "metric_text": "106分钟",
+          "metric_label": "片长",
+          "metric_source_id": "U01",
+          "rank": 4
+        },
+        {
+          "label": "野兽之心",
+          "detail": "片长102分钟｜美国｜布拉德·皮特、J·K·西蒙斯",
+          "icon": "idea",
+          "category": "片长·地区·主演",
+          "tags": [
+            "102分钟",
+            "美国"
+          ],
+          "metric_text": "102分钟",
+          "metric_label": "片长",
+          "metric_source_id": "U01",
+          "rank": 5
+        }
+      ],
+      "takeaway": "这份TOP10只反映HotPush聚合返回顺序，仅速查片长、地区与主要演员。",
+      "presentation": "editorial",
+      "presentation_version": 3,
+      "template_style": {
+        "background": "#f8f5ed",
+        "ink": "#24211d",
+        "accent": "#a43024",
+        "soft": "#eae5dc",
+        "heading_size": 68,
+        "body_size": 29,
+        "row_spacing": 14,
+        "radius": 14,
+        "heading_font": "serif",
+        "decoration": "rich",
+        "design_family": "magazine"
+      },
+      "template_package_id": "editorial",
+      "template_package_version": "84ef0ca6fefb27fc"
+    }
+  },
+  {
+    "index": 2,
+    "layout": "checklist",
+    "heading": "HotPush热映TOP10速查",
+    "kicker": "完整名次",
+    "body": [
+      "按HotPush聚合返回顺序"
+    ],
+    "footnote": "HotPush快照（豆瓣热映，2026-10-06）；缺剧情、票房与热度数据",
+    "claim_ids": [
+      "C01",
+      "C02",
+      "C03",
+      "C04",
+      "C05",
+      "C06",
+      "C07",
+      "C08",
+      "C09",
+      "C10",
+      "C11",
+      "C12"
+    ],
+    "visual": {
+      "kind": "rank",
+      "title": "HotPush热映TOP10速查",
+      "items": [
+        {
+          "label": "活色生香",
+          "detail": "片长106分钟｜中国大陆｜闫妮、叶童、倪虹洁",
+          "icon": "palette",
+          "category": "片长·地区·主演",
+          "tags": [
+            "106分钟",
+            "中国大陆"
+          ],
+          "metric_text": "106分钟",
+          "metric_label": "片长",
+          "metric_source_id": "U01",
+          "rank": 6
+        },
+        {
+          "label": "侦战",
+          "detail": "片长88分钟｜中国香港、中国大陆｜古天乐、此沙、任达华",
+          "icon": "briefcase",
+          "category": "片长·地区·主演",
+          "tags": [
+            "88分钟",
+            "中国香港"
+          ],
+          "metric_text": "88分钟",
+          "metric_label": "片长",
+          "metric_source_id": "U01",
+          "rank": 7
+        },
+        {
+          "label": "杀死比尔：血色全传",
+          "detail": "地区美国｜乌玛·瑟曼、刘玉玲、薇薇卡·福克斯",
+          "icon": "game",
+          "category": "地区·主演",
+          "tags": [
+            "美国",
+            "元数据速查"
+          ],
+          "metric_text": null,
+          "metric_label": null,
+          "metric_source_id": null,
+          "rank": 8
+        },
+        {
+          "label": "敦煌英雄",
+          "detail": "片长123分钟｜中国大陆｜章宇、窦骁、吕凉",
+          "icon": "globe",
+          "category": "片长·地区·主演",
+          "tags": [
+            "123分钟",
+            "中国大陆"
+          ],
+          "metric_text": "123分钟",
+          "metric_label": "片长",
+          "metric_source_id": "U01",
+          "rank": 9
+        },
+        {
+          "label": "老江湖",
+          "detail": "片长100分钟｜中国大陆｜于谦、梁家辉、王影璐",
+          "icon": "news",
+          "category": "片长·地区·主演",
+          "tags": [
+            "100分钟",
+            "中国大陆"
+          ],
+          "metric_text": "100分钟",
+          "metric_label": "片长",
+          "metric_source_id": "U01",
+          "rank": 10
+        }
+      ],
+      "takeaway": "这份TOP10只反映HotPush聚合返回顺序，仅速查片长、地区与主要演员。",
+      "presentation": "editorial",
+      "presentation_version": 3,
+      "template_style": {
+        "background": "#f8f5ed",
+        "ink": "#24211d",
+        "accent": "#a43024",
+        "soft": "#eae5dc",
+        "heading_size": 68,
+        "body_size": 29,
+        "row_spacing": 14,
+        "radius": 14,
+        "heading_font": "serif",
+        "decoration": "rich",
+        "design_family": "magazine"
+      },
+      "template_package_id": "editorial",
+      "template_package_version": "84ef0ca6fefb27fc"
+    }
+  }
+]

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>内容工作台 · 平台账号</title>
+  <link rel="stylesheet" href="/assets/app.css?v=20261004-discard1" />
+  <style>
+    .account-hero { background:#eef5ff; border:1px solid #dce8fc; border-radius:22px; padding:28px; margin:24px 0; }
+    .account-hero h2 { margin:8px 0; font-size:25px; }
+    .account-hero p { color:var(--muted); line-height:1.8; margin:0; }
+    .account-card { background:var(--panel); border:1px solid var(--line); border-radius:18px; padding:26px; }
+    .account-head { display:flex; align-items:center; gap:14px; margin-bottom:20px; }
+    .douyin-mark { width:52px; height:52px; border-radius:16px; background:#151a24; color:white; display:grid; place-items:center; font-size:30px; text-shadow:-2px -1px #55e2e4,2px 1px #ff6689; }
+    .account-head h2 { margin:0 0 4px; }
+    .account-head small { color:var(--muted); }
+    .account-steps { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; padding:0; margin:24px 0; list-style:none; counter-reset:step; }
+    .account-steps li { border-top:2px solid #e6edf6; padding-top:16px; color:var(--muted); line-height:1.8; }
+    .account-steps li:before { counter-increment:step; content:counter(step); display:inline-grid; place-items:center; width:25px; height:25px; border-radius:50%; background:#eaf0ff; color:var(--accent); margin-right:8px; font-weight:700; }
+    .account-steps strong { color:var(--text); }
+    .account-steps p { margin:8px 0; font-size:13px; }
+    .account-state { background:var(--bg); border-radius:12px; padding:18px; margin:20px 0; }
+    .account-state strong { display:block; margin-bottom:8px; }
+    .account-state p { margin:0; color:var(--muted); line-height:1.8; overflow-wrap:anywhere; }
+    .account-consent { display:flex; gap:10px; align-items:flex-start; line-height:1.8; font-size:13px; margin:20px 0; }
+    .account-consent input { margin-top:5px; width:17px; height:17px; flex-shrink:0; }
+    .account-actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .account-note { color:var(--muted); line-height:1.8; font-size:13px; margin-top:22px; }
+    #connection-error { color:#b62d49; line-height:1.8; margin-top:16px; }
+    @media(max-width:700px) { .account-steps{grid-template-columns:1fr;gap:8px}.account-card,.account-hero{padding:20px}.account-hero h2{font-size:22px} }
+  </style>
+<link rel="stylesheet" href="/assets/workbench.css?v=20261005"></head>
+<body>
+<nav class="nav" id="nav"></nav>
+<main class="wrap">
+  <h1>平台账号</h1>
+  <div class="sub">让成品与自己的创作账号连接起来。</div>
+  <section class="account-hero">
+    <span class="chip acc">先接入抖音</span>
+    <h2>扫一次码，从这里开始</h2>
+    <p>在这台电脑上打开抖音官方登录窗口，用手机确认。账号连接完成后，再安排发布与数据回访。</p>
+  </section>
+  <section class="account-card" aria-labelledby="douyin-title">
+    <div class="account-head"><span class="douyin-mark" aria-hidden="true">♪</span><div><h2 id="douyin-title">我的抖音账号</h2><small>本机浏览器连接 · 官方创作者后台</small></div></div>
+    <ol class="account-steps">
+      <li><strong>打开连接窗口</strong><p>点击下方按钮，系统会打开一个独立浏览器。请在这台电脑上操作。</p></li>
+      <li><strong>用抖音 App 扫码</strong><p>扫描官方页面的二维码，在手机上核对账号并确认登录。验证码和平台验证由你本人完成。</p></li>
+      <li><strong>回来看连接状态</strong><p>进入创作者后台首页后，系统检查登录状态。请同时核对窗口中显示的昵称与账号。</p></li>
+    </ol>
+    <div class="account-state" role="status" aria-live="polite"><strong id="connection-title">正在读取连接状态…</strong><p id="connection-message">请稍候。</p></div>
+    <label class="account-consent"><input type="checkbox" id="local-consent" /><span>我同意将抖音登录状态保存在这台电脑，供本工作台再次连接使用。密码、验证码只在抖音官方页面输入。</span></label>
+    <div class="account-actions">
+      <button class="btn primary" id="connect-douyin" disabled>打开抖音，扫码连接</button>
+      <button class="btn" id="check-douyin" disabled>我已登录，检查状态</button>
+      <button class="btn" id="close-douyin" disabled>关闭连接窗口</button>
+    </div>
+    <div id="connection-error" role="alert"></div>
+    <p class="account-note">连接后可进入<a href="/views/DouyinPublishing.html">抖音发布与回访</a>，上传已有图文、核对文案，再确认正式发布。系统依据官方页面核实作品记录；流量尚未更新时显示待更新。<br />关闭窗口会保留本机登录状态；下次打开会重新检查，平台要求重新登录时再扫码即可。连接成功本身不会发布内容。</p>
+    <p class="account-note"><a href="https://creator.douyin.com/" target="_blank" rel="noopener noreferrer">查看抖音官方创作者后台 ↗</a> · 请使用上方连接按钮完成接入；在普通浏览器登录不会自动接入工作台。</p>
+  </section>
+</main>
+<script type="module" src="/assets/platform-accounts.js?v=20261004-accounts1"></script>
+</body>
+</html>

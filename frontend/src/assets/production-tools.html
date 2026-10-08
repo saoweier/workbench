@@ -1,0 +1,50 @@
+  <section class="production-tools" id="manual-production"><h2>离线体验与高级生产</h2><p class="hint">日常创作请使用「新建创作」。这里保留离线体验、批次生产及诊断工具。</p>
+  <div class="banner">
+    <strong>两条产出路径。</strong>
+    「离线基线」用项目自带素材跑完整链路，<b>零真实调用、零费用</b>，几十秒出图 ——
+    它证明工程链路可用，<b>不代表</b>真实平台效果。
+    「按选题生产」可以用 <code>fixture</code>（契约演练）或 <code>real</code>（真实调用，可能产生费用）。
+    <span id="mode-note"></span>
+  </div>
+
+  <h2>离线基线：一键出成品</h2>
+  <div class="hint">等价于工作台首页那个按钮。用 C001 项目素材，跑完 研究 → 选题 → 双平台改写 → 渲染。</div>
+  <div class="actions">
+    <select id="sel-seed" style="min-width:340px"><option value="">— 选择 seed —</option></select>
+    <button class="primary" id="btn-seed">一键出成品（local_seed）</button>
+    <button id="btn-attention">看集中处理</button>
+  </div>
+  <div id="progress"></div>
+
+  <h2>按选题生产</h2>
+  <div class="hint">
+    这条路径会建批次、按生产许可排队，交给 Worker 执行。
+    <b>三条限制并列</b>：批次条目数、待预览库存、金额上限（仅设置时生效）。任一条触顶就只保存候选。
+  </div>
+  <div class="panel" style="padding:14px 16px">
+    <label for="f-materials">参考资料（粘贴原文；保留来源信息，供模型据此写稿）</label><textarea id="f-materials" placeholder="可贴自己的工作记录、文章或产品说明。"></textarea>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+      <div><label class="hint" style="display:block;margin:0 0 3px">选题 topic</label>
+        <input id="f-topic" style="width:100%" placeholder="例如：AI 帮我做自媒体，我还得干哪些事？" /></div>
+      <div><label class="hint" style="display:block;margin:0 0 3px">运行模式 run_mode</label>
+        <select id="f-mode" style="width:100%">
+          <option value="fixture">fixture（契约演练，不出网）</option>
+          <option value="real">real（真实调用，可能产生费用）</option>
+        </select></div>
+      <div><label class="hint" style="display:block;margin:0 0 3px">seed（可选）</label>
+        <input id="f-seed" style="width:100%" placeholder="留空则不用 seed" /></div>
+      <div><label class="hint" style="display:block;margin:0 0 3px">平台</label>
+        <input id="f-platforms" style="width:100%" value="douyin,xiaohongshu" /></div>
+      <div><label class="hint" style="display:block;margin:0 0 3px">金额上限（微单位，留空 = 不设）</label>
+        <input id="f-budget" style="width:100%" type="number" placeholder="留空 = 不设置" /></div>
+    </div>
+    <div class="actions">
+      <button id="btn-batch">建批次（item_limit = 1）</button>
+      <button id="btn-enqueue" disabled>按选题排队生产</button>
+      <span class="hint" style="margin:0" id="batch-msg"></span>
+    </div>
+    <div id="batch-out"></div>
+  </div>
+  </section>
+
+<details class="tool-log"><summary>查看操作日志</summary><div class="log" id="log"></div></details>

@@ -1,0 +1,123 @@
+[
+  {
+    "index": 1,
+    "layout": "cover",
+    "heading": "四步上手新版 2Do",
+    "kicker": "新人上手指南",
+    "body": [
+      "适合刚用 2Do、想把日常事务管起来的新用户。",
+      "以 macOS 为主，兼顾 iOS 快速录入。"
+    ],
+    "footnote": "依据官方站点与少数派公开资料整理，未独立实测。",
+    "claim_ids": [
+      "C06",
+      "C07",
+      "C09",
+      "C10",
+      "C11"
+    ],
+    "visual": {
+      "kind": "flow",
+      "title": "四步搭起你的日常任务流",
+      "presentation": "editorial",
+      "items": [
+        {
+          "label": "输入待办",
+          "detail": "Quick Entry 在 2Do 未运行或不在前台时也能唤起，念头随手丢进一处。",
+          "icon": "pencil"
+        },
+        {
+          "label": "设日期与时长",
+          "detail": "写「今天」「下周五」「3 天后」或 15:30，[2h] 与 [30m] 是预估时长。",
+          "icon": "chart"
+        },
+        {
+          "label": "分列表和标签",
+          "detail": "/工作 指定列表，#写作 加标签，@办公室 记地点，都写在标题句里。",
+          "icon": "briefcase"
+        },
+        {
+          "label": "每天看 Today",
+          "detail": "开启 Calendar events 后当天日程条出现，任务与会议并排看。",
+          "icon": "search"
+        }
+      ],
+      "takeaway": "输入、日期、分类、总览各就位，2Do 当天就能替你记事。",
+      "presentation_version": 3,
+      "template_style": {
+        "background": "#f8f5ed",
+        "ink": "#24211d",
+        "accent": "#a43024",
+        "soft": "#eae5dc",
+        "heading_size": 68,
+        "body_size": 29,
+        "row_spacing": 14,
+        "radius": 14,
+        "heading_font": "serif",
+        "decoration": "rich",
+        "design_family": "magazine"
+      },
+      "template_package_id": "editorial",
+      "template_package_version": "84ef0ca6fefb27fc"
+    }
+  },
+  {
+    "index": 2,
+    "layout": "checklist",
+    "heading": "会议后批量收、换设备也不丢",
+    "kicker": "批量收集与同步",
+    "body": [
+      "会议散场后一次记完，再挑同步后端。"
+    ],
+    "footnote": "依据官方站点与少数派公开资料整理，未独立实测。",
+    "claim_ids": [
+      "C14",
+      "C15",
+      "C16"
+    ],
+    "visual": {
+      "kind": "checklist",
+      "title": "记完再选同步方式",
+      "presentation": "editorial",
+      "items": [
+        {
+          "label": "iOS 连续录入",
+          "detail": "长按右下角「+」进入连续输入，一条接一条记完会议待办。",
+          "icon": "check"
+        },
+        {
+          "label": "macOS 快速面板",
+          "detail": "按 shift-cmd-2 打开录入面板，再按一次即保存并清空输入框。",
+          "icon": "code"
+        },
+        {
+          "label": "可选同步后端",
+          "detail": "Dropbox、提醒事项、Todoist、iCloud 或自建 CalDAV 等。",
+          "icon": "globe"
+        },
+        {
+          "label": "第三方元数据限制",
+          "detail": "提醒事项与 Todoist 双向同步可跨平台，但标签组、附件不被支持。",
+          "icon": "question"
+        }
+      ],
+      "takeaway": "批量记用连打，同步看后端；重标签组与附件的人慎选第三方。",
+      "presentation_version": 3,
+      "template_style": {
+        "background": "#f8f5ed",
+        "ink": "#24211d",
+        "accent": "#a43024",
+        "soft": "#eae5dc",
+        "heading_size": 68,
+        "body_size": 29,
+        "row_spacing": 14,
+        "radius": 14,
+        "heading_font": "serif",
+        "decoration": "rich",
+        "design_family": "magazine"
+      },
+      "template_package_id": "editorial",
+      "template_package_version": "84ef0ca6fefb27fc"
+    }
+  }
+]

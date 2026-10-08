@@ -1,0 +1,21 @@
+{
+  "id": "editorial",
+  "name": "杂志编辑海报",
+  "description": "衬线大标题、不对称分栏、红黑细线和开放留白，适合观察与对照",
+  "renderer": "editorial",
+  "version": 3,
+  "forms": [],
+  "style": {
+    "background": "#f8f5ed",
+    "ink": "#24211d",
+    "accent": "#a43024",
+    "soft": "#eae5dc",
+    "heading_size": 68,
+    "body_size": 29,
+    "row_spacing": 14,
+    "radius": 14,
+    "heading_font": "serif",
+    "decoration": "rich",
+    "design_family": "magazine"
+  }
+}

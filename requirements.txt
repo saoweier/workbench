@@ -1,0 +1,38 @@
+# 内容工作台 · 运行依赖
+#
+# 装法（三平台通用）：
+#     python -m venv .venv
+#     .venv/bin/pip install -r requirements.txt      # Windows: .venv\Scripts\pip
+#     .venv/bin/playwright install chromium          # 渲染出图必需，约 150 MB
+#
+# 版本全部锁定到本机实测通过的版本。上游发新版不会悄悄改行为；
+# 想升级请改这里并重跑 ./scripts/run-all-tests.sh（测试结果见 docs/TEST_REPORT.md）。
+
+# ---- Web 框架 ----
+fastapi==0.116.1
+uvicorn==0.35.0
+starlette==0.47.2
+python-multipart==0.0.20
+
+# ---- 数据校验与配置 ----
+pydantic==2.10.3
+pydantic-settings==2.10.1
+
+# ---- 数据库 ----
+SQLAlchemy==2.0.41
+greenlet==3.2.3
+
+# ---- 渲染出图 ----
+playwright==1.60.0
+pillow==11.3.0
+numpy==2.3.1
+edge-tts==7.2.8
+imageio-ffmpeg==0.6.0
+
+# ---- 测试与工具 ----
+httpx==0.28.1                    # TestClient 依赖；pytest 的替代（本项目用纯脚本测试）
+
+# 说明：本项目**不用 pytest**。测试是可直接运行的脚本：
+#     ./scripts/run-all-tests.sh                  # 全量 P0–P5
+#     .venv/bin/python backend/tests/test_p5_e2e.py
+# 所以测试依赖只有 httpx（TestClient 需要），没有 pytest。

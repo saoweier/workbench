@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>内容工作台 · 抖音发布与回访</title><link rel="stylesheet" href="/assets/app.css?v=20261004-discard1" />
+<style>
+ .publish-intro{background:#edf5ff;border:1px solid #dce8fb;padding:24px;border-radius:20px;margin:24px 0;line-height:1.8}
+ .publish-intro h2{margin:0 0 8px;font-size:24px}.publish-intro p{margin:0;color:var(--muted)}
+ .publish-setup,.publish-task{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;margin:20px 0}
+ .publish-setup label{display:block;margin-bottom:10px}.publish-setup select{min-width:260px;max-width:100%;padding:10px;border:1px solid var(--line);border-radius:9px}
+ .publish-task h2{font-size:20px;margin:0 0 12px}.publish-meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;color:var(--muted);font-size:13px;margin:14px 0}
+ .publish-images{display:flex;gap:12px;overflow:auto;padding:8px 0 16px}.publish-images a{flex:0 0 150px}.publish-images img{width:150px;aspect-ratio:3/4;object-fit:contain;border-radius:10px;border:1px solid var(--line)}
+ .publish-caption{white-space:pre-wrap;line-height:1.9;font-size:14px;background:var(--bg);padding:18px;border-radius:10px;max-height:300px;overflow:auto}
+ .publish-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}.publish-actions .btn{white-space:normal}
+ .publish-confirm{display:flex;align-items:flex-start;gap:10px;margin:18px 0;line-height:1.8;font-size:14px}.publish-confirm input{width:18px;height:18px;flex-shrink:0;margin-top:4px}
+ .publish-message{line-height:1.8;margin:12px 0;color:var(--muted)}.publish-error{color:#b52d47;line-height:1.8}.publish-metrics{display:flex;gap:20px;flex-wrap:wrap;line-height:1.8}
+ @media(max-width:700px){.publish-setup,.publish-task,.publish-intro{padding:18px}.publish-images a,.publish-images img{width:120px;flex-basis:120px}}
+</style><link rel="stylesheet" href="/assets/workbench.css?v=20261005"></head><body><nav class="nav" id="nav"></nav><main class="wrap">
+ <h1>抖音 · 浏览器辅助发布与回访</h1><div class="sub">选一份成品，核对账号和图文，再确认发布。</div>
+ <div id="status" role="status">正在检查账号连接…</div>
+<p id="publishing-mode" role="status">正在读取操作方式…</p><div class="actions"><a class="btn" href="/views/PublishingHub.html">选择操作方式</a><a class="btn" href="/views/ManualPublishing.html">手动发布与回填数据</a></div>
+ <section class="publish-intro"><h2>把成品送到自己的账号</h2><p>上传图片与文案后，系统会停在发布前等待你确认。实际提交后再核实作品编号和审核状态；指标尚未更新时如实保留缺失。</p></section>
+ <section class="publish-setup"><label for="publish-content">本轮要发布的内容</label><select id="publish-content" disabled><option value="">正在读取成品…</option></select> <button class="btn primary" id="prepare-publish" disabled>建立发布准备</button><p class="publish-message">仅列出真实生成且已有完整页图的抖音版本。建立准备会保存这一版图文，不会上传或发布。</p></section>
+ <div id="publish-error" class="publish-error" role="alert"></div><div id="publish-tasks"></div>
+</main><script type="module" src="/assets/douyin-publishing.js?v=20261004-studio2"></script></body></html>

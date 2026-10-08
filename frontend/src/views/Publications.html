@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>内容工作台 · 发布记录</title>
+<link rel="stylesheet" href="/assets/app.css?v=20261004-discard1" />
+<style>
+  /* declared / verified 两栏视觉上必须分开，不能让人误以为是同一件事 */
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:0; border:1px solid var(--line);
+    border-radius:7px; overflow:hidden; }
+  .two > div { padding:9px 12px; }
+  .two > div:first-child { border-right:1px solid var(--line); background:var(--bg); }
+  .two .ttl { font-size:11px; color:var(--muted); margin-bottom:4px; }
+  .two .val { font-size:12.5px; word-break:break-all; }
+  input, select, textarea { padding:6px 9px; border:1px solid var(--line); border-radius:7px;
+    background:var(--panel); color:var(--text); font:inherit; font-size:12.5px; }
+  input:focus, select:focus { outline:2px solid color-mix(in srgb,var(--accent) 35%,transparent); }
+  .form { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:10px; }
+  .form label { display:block; font-size:11.5px; color:var(--muted); margin-bottom:3px; }
+  .form .full { grid-column:1/-1; }
+  .act-cell { display:flex; flex-direction:column; gap:5px; }
+</style>
+<link rel="stylesheet" href="/assets/workbench.css?v=20261005"></head>
+<body>
+<nav class="nav" id="nav"></nav>
+
+<div class="wrap">
+  <h1>发布记录</h1>
+  <div class="sub">P4 · 登记与核验。<b>人声明的和人核验过的，永远是两组字段。</b></div>
+
+  <div id="status"></div>
+
+  <div class="banner warn">
+    <strong>「已发布」是两件事，不是一个勾。</strong>
+    你点「已发布」时，系统并不真的知道平台那边发生了什么。<br/>
+    <b>declared</b>（你声称的）= 链接 / 作品 ID / 发布时间；<b>verified</b>（人核验过的）= 状态 / 时间 / 核验人。
+    声明<b>永远不覆盖</b>核验结果，核验失败也<b>不抹掉</b>你声明的链接。
+  </div>
+
+  <div class="banner err">
+    <strong>登记人必须是真人。</strong>
+    接口层把 <code>registered_by</code> / <code>verified_by</code> 固定为 <code>user</code>，
+    <b>不读客户端传的值</b> —— 模型不能替你把东西标记成已发布。
+    核验人传 <code>system</code> / <code>model</code> / <code>ai</code> 会被直接拒绝（<code>VERIFIER_MUST_BE_HUMAN</code>）。
+  </div>
+
+  <h2>概览</h2>
+  <div class="grid" id="overview"></div>
+
+  <h2>登记清单</h2>
+  <div class="hint">
+    「未核验」显示为<b>未核验</b>而不是「正常」——
+    没核验过和核验过没问题，是两种完全不同的状态。
+  </div>
+  <div class="panel"><table>
+    <thead><tr>
+      <th style="width:13%">平台 / 记录</th>
+      <th style="width:27%">declared（人声明）</th>
+      <th style="width:24%">verified（人核验）</th>
+      <th style="width:20%">观察窗口</th>
+      <th style="width:16%">操作</th>
+    </tr></thead>
+    <tbody id="rows"></tbody>
+  </table></div>
+
+  <h2>登记新发布</h2>
+  <div class="hint">
+    链接与平台作品 ID <b>至少填一个</b> —— 两者都空不算一条发布记录。
+    这里<b>必须选一个已渲染的平台稿</b>：没有对应稿子的发布记录，数据回填时找不到挂靠点。
+  </div>
+  <div class="panel" style="padding:14px 16px">
+    <div class="form">
+      <div class="full">
+        <label>平台稿（platform_revision_id）</label>
+        <select id="f-pr"><option value="">— 选择已渲染的平台稿 —</option></select>
+      </div>
+      <div><label>平台链接 link</label><input id="f-link" placeholder="https://v.douyin.com/…" /></div>
+      <div><label>平台作品 ID</label><input id="f-post" placeholder="7300000001" /></div>
+      <div><label>发布时间</label><input id="f-at" type="datetime-local" /></div>
+      <div><label>登记来源</label>
+        <select id="f-src">
+          <option value="manual">manual（人工登记）</option>
+          <option value="platform_export">platform_export（平台导出）</option>
+        </select></div>
+      <div class="full"><label>备注（可选）</label><input id="f-note" placeholder="例如：首发，未投流" /></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="btn-reg">登记一条发布</button>
+      <span class="hint" style="margin:0" id="reg-msg"></span>
+    </div>
+  </div>
+
+  <h2>核验结果的含义</h2>
+  <div class="panel"><table>
+    <thead><tr><th style="width:16%">verified_state</th><th>含义与后续动作</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chip ok">confirmed</span></td>
+          <td>链接可打开、内容与发布包一致。可以开始按窗口采集数据。</td></tr>
+      <tr><td><span class="chip warn">mismatch</span></td>
+          <td><b>这是一个有效结论，不是「还没核验」。</b>平台上的内容与本地发布包不一致 ——
+              先查清是哪一版被发出去的，<b>不要</b>急着导入数据，否则数据会挂到错的稿子上。</td></tr>
+      <tr><td><span class="chip warn">inaccessible</span></td>
+          <td>链接打不开（已删、仅自己可见、区域限制）。同理，<b>这是结论</b>，
+              不代表内容没问题，也不代表能拿它当基线。</td></tr>
+      <tr><td><span class="chip">null</span></td>
+          <td><b>未核验。</b>页面必须显示成「未核验」，不得显示成「正常」或任何正面措辞。</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>语义与能力边界</h2>
+  <div class="panel" style="padding:14px 16px;max-width:620px" id="semantics"></div>
+
+  <h2>操作日志</h2>
+  <div class="log" id="log"></div>
+</div>
+
+<script type="module">
+import { api, navBar, statusBar, toast, log, guard, esc, time } from "/assets/app.js?v=20261005";
+
+document.getElementById("nav").innerHTML = navBar("Publications");
+
+const PLATFORM = { douyin: "抖音", xiaohongshu: "小红书" };
+const STATE_CHIP = { confirmed: ["ok", "已确认"], mismatch: ["warn", "不一致"],
+                     inaccessible: ["warn", "打不开"] };
+
+// 「没核验」永远不渲染成「正常」
+function verifiedCell(v) {
+  if (!v) {
+    return `<span class="chip">未核验</span>
+      <div class="hint" style="margin:3px 0 0">没人核验过 ≠ 没问题</div>`;
+  }
+  const [cls, label] = STATE_CHIP[v.state] || ["", v.state];
+  return `<span class="chip ${cls}">${esc(label)}</span>
+    <div class="hint" style="margin:3px 0 0">${time(v.at)} · ${esc(v.by || "")}</div>`;
+}
+
+function windowsCell(p) {
+  // 列表接口不返回观察窗口（那是登记时的即时计算结果），按发布时间自己算，
+  // 并如实标明依据：没填发布时间就没有窗口，不能假装有。
+  if (!p.published_at) {
+    return '<span class="chip warn">未填发布时间，窗口无法计算</span>';
+  }
+  const ageH = (Date.now() - new Date(p.published_at).getTime()) / 3600000;
+  const marks = [24, 72, 168];
+  return `<div class="hint" style="margin:0 0 4px">发布后 ${ageH.toFixed(1)} 小时</div>`
+    + marks.map(h => ageH >= h
+        ? `<span class="chip warn">${h}h 已到期</span>`
+        : `<span class="chip">${h}h 未到期（${(h - ageH).toFixed(1)}h 后）</span>`).join(" ");
+}
+
+let ITEMS = [];
+
+function renderOverview(p) {
+  const items = p.items || [];
+  const unver = items.filter(x => !x.verified).length;
+  const conf = items.filter(x => x.verified && x.verified.state === "confirmed").length;
+  const bad = items.filter(x => x.verified
+    && (x.verified.state === "mismatch" || x.verified.state === "inaccessible")).length;
+  const changed = items.filter(x => x.revision_changed_since_publish).length;
+  const cards = [
+    { n: p.total ?? 0, l: "发布记录总数", cls: (p.total || 0) ? "" : "is-null" },
+    { n: unver, l: "未核验（verified = null）", cls: unver ? "is-warn" : "is-null" },
+    { n: conf, l: "已确认", cls: conf ? "" : "is-null" },
+    { n: bad, l: "不一致 / 打不开", cls: bad ? "is-warn" : "is-null" },
+    { n: changed, l: "发布后稿子又改过", cls: changed ? "is-warn" : "is-null" },
+  ];
+  document.getElementById("overview").innerHTML = cards.map(c =>
+    `<div class="card ${c.cls}"><div class="n">${c.n}</div><div class="l">${esc(c.l)}</div></div>`).join("");
+}
+
+function renderRows(items) {
+  document.getElementById("rows").innerHTML = items.length ? items.map(p => {
+    const d = p.declared || {};
+    const link = d.link
+      ? `<a href="${esc(d.link)}" target="_blank" rel="noreferrer">${esc(d.link)}</a>`
+      : '<span class="missing">未填</span>';
+    return `<tr data-id="${esc(p.id)}">
+      <td>
+        <div><b>${esc(PLATFORM[p.platform] || p.platform)}</b></div>
+        <div style="color:var(--muted);font-size:11px">${esc(p.status || "")}</div>
+        ${p.revision_changed_since_publish
+          ? '<div><span class="chip warn" style="margin-top:4px">发布后稿子又改过</span></div>' : ""}
+      </td>
+      <td>
+        <div class="two">
+          <div><div class="ttl">link</div><div class="val">${link}</div></div>
+          <div><div class="ttl">post_id</div>
+            <div class="val">${d.platform_post_id
+              ? `<code>${esc(d.platform_post_id)}</code>`
+              : '<span class="missing">未填</span>'}</div></div>
+        </div>
+        <div class="hint" style="margin:4px 0 0">
+          ${d.published_at ? time(d.published_at) : '<span class="missing">未填发布时间</span>'}
+          · 来源 <code>${esc(d.declaration_source || "")}</code>
+          · 登记人 <code>${esc(d.registered_by || "")}</code>
+        </div>
+        <div class="hint" style="margin:3px 0 0">
+          发布时 manifest <code>${esc((p.published_manifest_hash || "").slice(0, 12))}…</code>
+          · 运行模式 ${esc(p.run_mode || "")}
+        </div>
+      </td>
+      <td>${verifiedCell(p.verified)}</td>
+      <td>${windowsCell(p)}</td>
+      <td><div class="act-cell">
+        <button data-verify="confirmed" data-pr="${esc(p.id)}">核验：可打开且一致</button>
+        <button data-verify="mismatch" data-pr="${esc(p.id)}">核验：内容不一致</button>
+        <button data-verify="inaccessible" data-pr="${esc(p.id)}">核验：打不开</button>
+      </div></td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="5" class="empty">还没有发布记录。在下面登记一条。</td></tr>`;
+
+  document.querySelectorAll("[data-verify]").forEach(b => b.onclick = guard(async () => {
+    const state = b.dataset.verify;
+    const r = await api.post(`/publications/${b.dataset.pr}/verify`,
+      { verified_state: state, note: `在发布记录页人工核验为 ${state}` });
+    log(`已核验 ${r.platform || ""}：${state}；verified_by = ${r.verified_by}`
+      + `（服务端固定为 user，客户端传什么都无效）。`, "ok");
+    toast(`核验结果已记录：${state}`, "ok");
+    await load();
+  }));
+}
+
+function renderSemantics(p) {
+  const s = p.semantics || {};
+  const c = p.capabilities || {};
+  document.getElementById("semantics").innerHTML = [
+    ["declared", esc(s.declared || "人已登记发布信息，但未核验")],
+    ["verified", esc(s.verified || "人已核验过发布确实存在")],
+    ["withdrawn", esc(s.withdrawn || "人标记为已撤回")],
+    ["never_auto", esc(s.never_auto || "")],
+    ["自动发布入口", `<code>auto_publish = ${c.auto_publish === true}</code>`],
+    ["说明", esc(c.note || p.note || "")],
+  ].map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:14px;padding:6px 0;border-bottom:1px dashed var(--line)">
+      <span>${esc(k)}</span><span style="color:var(--muted);text-align:right">${v}</span></div>`).join("");
+}
+
+async function load() {
+  const p = await api.get("/publications");
+  ITEMS = p.items || [];
+  renderOverview(p);
+  renderRows(ITEMS);
+  renderSemantics(p);
+
+  // 下拉框：只列已渲染、且还没有发布记录的平台稿
+  const registered = new Set(ITEMS.map(x => x.platform_revision_id));
+  const contents = (await api.get("/contents").catch(() => ({ items: [] }))).items || [];
+  const opts = [];
+  for (const c of contents) {
+    const detail = await api.get(`/contents/${c.id}`).catch(() => null);
+    if (!detail) continue;
+    for (const rev of detail.revisions || []) {
+      if (rev.revision_id !== detail.active_revision_id) continue;
+      for (const pl of rev.platforms || []) {
+        if (!(pl.artifacts || []).length) continue;
+        opts.push({ id: pl.platform_revision_id, label:
+          `${c.display_id} · ${PLATFORM[pl.platform] || pl.platform} · v${pl.version}`
+          + `（${pl.page_count} 页）${registered.has(pl.platform_revision_id) ? " · 已登记" : ""}` });
+      }
+    }
+  }
+  const sel = document.getElementById("f-pr");
+  sel.innerHTML = '<option value="">— 选择已渲染的平台稿 —</option>'
+    + opts.map(o => `<option value="${esc(o.id)}">${esc(o.label)}</option>`).join("");
+  log(`发布记录 ${p.total} 条；未核验 ${ITEMS.filter(x => !x.verified).length} 条。`);
+  log(`可登记的平台稿 ${opts.length} 个（已渲染）。`);
+}
+
+const loadWrapped = guard(load);
+
+document.getElementById("btn-reg").onclick = guard(async () => {
+  const prId = document.getElementById("f-pr").value;
+  const link = document.getElementById("f-link").value.trim();
+  const post = document.getElementById("f-post").value.trim();
+  const at = document.getElementById("f-at").value;
+  const msg = document.getElementById("reg-msg");
+  msg.textContent = "";
+
+  if (!prId) { msg.innerHTML = '<span class="missing">请先选一个平台稿。</span>'; return; }
+  if (!link && !post) {
+    msg.innerHTML = '<span class="missing">链接与平台作品 ID 至少填一个。</span>';
+    return;
+  }
+  const body = {
+    platform_revision_id: prId,
+    link: link || null,
+    platform_post_id: post || null,
+    published_at: at ? new Date(at).toISOString() : null,
+    declaration_source: document.getElementById("f-src").value,
+    note: document.getElementById("f-note").value.trim() || null,
+  };
+  const r = await api.post("/publications", body);
+  log(`已登记：${r.platform} · ${r.status} · 登记人 ${r.declared?.registered_by}`, "ok");
+  if (r.verified === null || r.verified === undefined) {
+    log("verified = null（未核验）。界面显示为「未核验」，不显示为「正常」。");
+  }
+  if (r.approval_consistent === false) {
+    log("approval_consistent = false —— 该平台稿没有批准记录，属于先发布后补流程。", "err");
+  }
+  for (const w of r.warnings || []) log(w, "err");
+  toast("发布记录已建立。核验请单独做。", "ok");
+  document.getElementById("f-link").value = "";
+  document.getElementById("f-post").value = "";
+  await load();
+});
+
+document.getElementById("status").innerHTML = await statusBar();
+await loadWrapped();
+log("页面就绪。数据来自 GET /api/v1/publications。");
+</script>
+</body>
+</html>

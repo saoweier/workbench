@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>内容工作台 · 用量与消耗</title>
+<link rel="stylesheet" href="/assets/app.css?v=20261004-discard1" />
+<style>
+  .kv { display:flex; justify-content:space-between; gap:16px; font-size:12.5px;
+    padding:7px 0; border-bottom:1px dashed var(--line); }
+  .kv:last-child { border-bottom:0; }
+  .kv > span:last-child { color:var(--muted); text-align:right; }
+  .note { font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.55; }
+  .num { text-align:right; font-variant-numeric:tabular-nums; }
+</style>
+<link rel="stylesheet" href="/assets/workbench.css?v=20261005"></head>
+<body>
+<nav class="nav" id="nav"></nav>
+
+<div class="wrap">
+  <h1>用量与消耗</h1>
+  <div class="sub">P3 · 用量与金额上限。<b>唯一数据来源是 <code>provider_call</code> 表</b>。</div>
+
+  <div id="status"></div>
+
+  <div class="banner warn">
+    <strong>金额未知 ≠ 0 元。</strong>
+    没拿到金额的调用计作「待核实笔数」，<b>不并进合计</b>，也不当成免费。
+    未设置金额上限（<code>null</code>）既不是零额度，也不是无限调用 —— 仍受次数、库存与重试上限约束。
+  </div>
+
+  <h2>按运行模式分列</h2>
+  <div class="hint">三种来源分开计数。<b>fixture 与 local_seed 的消耗不混入真实成本结论</b>。</div>
+  <div class="panel"><table>
+    <thead><tr>
+      <th style="width:14%">模式</th><th class="num">调用</th><th class="num">成功</th>
+      <th class="num">失败</th><th class="num">结果未知</th>
+      <th class="num">输入 tokens</th><th class="num">输出 tokens</th>
+      <th class="num">已报金额</th><th class="num">估算金额</th>
+    </tr></thead>
+    <tbody id="buckets"></tbody>
+  </table></div>
+  <div class="note" id="bucket-note"></div>
+
+  <h2>合计</h2>
+  <div class="grid" id="totals"></div>
+
+  <h2>金额上限策略</h2>
+  <div class="hint">默认 <code>usage_tracking</code> 只记录不阻塞；<code>hard_cap</code> 需有可估价依据。</div>
+  <div class="panel" style="padding:14px 16px" id="policy"></div>
+
+  <div class="banner" id="policy-expl"></div>
+
+  <h2>试算「再发一次调用是否允许」</h2>
+  <div class="hint">
+    这是一个<b>只读试算</b>：不会真的发起调用，也不会写账。
+    结果未知的调用<b>不重发</b>，先查状态。
+  </div>
+  <div class="panel" style="padding:14px 16px">
+    <div class="actions" style="margin:0">
+      <input id="q-micro" type="number" placeholder="候选金额（微单位，可留空）" style="width:210px" />
+      <input id="q-calls" type="number" placeholder="已有调用数（可留空）" style="width:180px" />
+      <button id="btn-check">试算</button>
+    </div>
+    <div id="check-out" class="note"></div>
+  </div>
+
+  <h2>数据来源</h2>
+  <div class="panel" style="padding:14px 16px" id="source"></div>
+
+  <h2>操作日志</h2>
+  <div class="log" id="log"></div>
+</div>
+
+<script type="module">
+import { api, navBar, statusBar, toast, log, guard, esc, money, num } from "/assets/app.js?v=20261005";
+
+document.getElementById("nav").innerHTML = navBar("UsageCosts");
+
+const MODE_ORDER = ["real", "fixture", "local_seed"];
+const MODE_LABEL = { real: "真实调用", fixture: "契约演练", local_seed: "项目资料" };
+
+/** 币种字典 → 一行可读文本。空字典 ≠ ¥0.00，必须说清楚是「没有可定价的笔数」。 */
+function moneyDict(dict, emptyText) {
+  const entries = Object.entries(dict || {});
+  if (!entries.length) return `<span class="missing">${emptyText}</span>`;
+  return entries.map(([cur, micro]) => money(micro) + " " + esc(cur)).join(" · ");
+}
+
+function intOrMissing(v) {
+  if (v === null || v === undefined) return '<span class="missing">未回传</span>';
+  return num(v);
+}
+
+function renderUsage(u) {
+  // ---- 分模式表 ----
+  // by_run_mode 只含"有记录"的模式；另外两个模式从 real/fixture/local_seed 顶层键补上，
+  // 否则「0 次调用」会看起来像「这个模式不存在」。
+  const buckets = { ...(u.by_run_mode || {}) };
+  for (const m of MODE_ORDER) if (!buckets[m] && u[m]) buckets[m] = u[m];
+  const order = Object.keys(buckets).sort(
+    (a, b) => (MODE_ORDER.indexOf(a) + 99) % 99 - (MODE_ORDER.indexOf(b) + 99) % 99);
+
+  document.getElementById("buckets").innerHTML = order.map(m => {
+    const b = buckets[m] || {};
+    const unknown = b.unknown_result ?? 0;
+    return `<tr>
+      <td><span class="mode ${esc(m)}">${esc(MODE_LABEL[m] || m)}</span><br/>
+          <code>${esc(m)}</code></td>
+      <td class="num">${b.calls ?? 0}</td>
+      <td class="num">${b.succeeded ?? 0}</td>
+      <td class="num">${b.failed ?? 0}</td>
+      <td class="num">${unknown > 0 ? `<b style="color:var(--warn)">${unknown}</b>` : "0"}</td>
+      <td class="num">${intOrMissing(b.input_tokens)}</td>
+      <td class="num">${intOrMissing(b.output_tokens)}</td>
+      <td class="num">${moneyDict(b.reported_micro_by_currency, "无可定价笔数")}</td>
+      <td class="num">${moneyDict(b.estimated_micro_by_currency, "无可定价笔数")}</td>
+    </tr>`;
+  }).join("");
+
+  const notes = [...new Set(order.map(m => buckets[m]?.tokens_note).filter(Boolean))];
+  document.getElementById("bucket-note").innerHTML = notes.map(esc).join("<br/>");
+
+  // ---- 合计卡 ----
+  const real = u.real || {};
+  const realReported = moneyDict(real.reported_micro_by_currency, "未知");
+  const realEstimated = moneyDict(real.estimated_micro_by_currency, "未知");
+  const none = (u.total_calls ?? 0) === 0;
+  const cards = [
+    { n: u.total_calls ?? 0, l: "总调用笔数", cls: none ? "is-null" : "" },
+    { n: real.calls ?? 0, l: "真实调用笔数", cls: none ? "is-null" : "" },
+    { n: realReported, l: "真实调用·服务商已报金额",
+      cls: Object.keys(real.reported_micro_by_currency || {}).length ? "" : "is-null" },
+    { n: realEstimated, l: "真实调用·本地估算金额",
+      cls: Object.keys(real.estimated_micro_by_currency || {}).length ? "" : "is-null" },
+    { n: real.unknown_result ?? 0, l: "结果未知（待人工核实）",
+      cls: (real.unknown_result || 0) > 0 ? "is-warn" : "is-null" },
+    { n: real.unpriced_calls ?? 0, l: "无可估价依据的笔数",
+      cls: (real.unpriced_calls || 0) > 0 ? "is-warn" : "is-null" },
+  ];
+  document.getElementById("totals").innerHTML = cards.map(c =>
+    `<div class="card ${c.cls}">
+       <div class="n">${c.n}</div>
+       <div class="l">${esc(c.l)}</div>
+     </div>`).join("");
+
+  const disp = u.display || {};
+  if (disp.note) {
+    document.getElementById("totals").insertAdjacentHTML("beforeend",
+      `<div class="banner warn" style="grid-column:1/-1;margin:0">
+        <strong>${esc(disp.real_cost || "")}</strong>　${esc(disp.note)}
+        <div class="note">fixture：${esc(disp.fixture_cost || "")}　
+          ${esc(real.money_note || "")}</div>
+      </div>`);
+  }
+}
+
+function renderPolicy(p) {
+  const pol = p.policy || {};
+  const m = pol.money || {}, nm = pol.non_money || {};
+  const rows = [
+    ["当前计费模式", `<b>${esc(m.cost_mode || "usage_tracking")}</b>`],
+    ["批次金额上限", m.batch_money_limit_micro === null || m.batch_money_limit_micro === undefined
+      ? '<span class="missing">null（未设置）</span>' : money(m.batch_money_limit_micro)],
+    ["每日金额上限", m.daily_money_limit_micro === null || m.daily_money_limit_micro === undefined
+      ? '<span class="missing">null（未设置）</span>' : money(m.daily_money_limit_micro)],
+    ["金额上限语义", esc(m.meaning || "null 不等于 0：未设上限 ≠ 零额度，也 ≠ 无限调用")],
+    ["阻塞范围", esc(m.enforced_in || "usage_tracking 模式不因金额阻塞")],
+    ["单次运行调用上限", `${nm.max_calls_per_run ?? "—"} 次 / 单次运行`],
+    ["逐条内容上限", `${nm.item_limit ?? "—"} 个 / 批`],
+    ["待预览库存上限", `${nm.pending_review_stock_limit ?? "—"} 个`],
+    ["修复轮次上限", `${nm.max_repair_rounds ?? "—"} 轮，超出标 <code>unrepairable</code>`],
+    ["非金额限制说明", esc(nm.meaning || "")],
+  ];
+  document.getElementById("policy").innerHTML = rows.map(([k, v]) =>
+    `<div class="kv"><span>${esc(k)}</span><span>${v}</span></div>`).join("");
+
+  const ex = p.explanation || {};
+  document.getElementById("policy-expl").innerHTML = `
+    <strong>hard_cap 模式的暂停语义：</strong>
+    ${esc(ex.hard_cap || "当上限已设但无法估价时，系统暂停付费调用，而不是当成免费放行。")}
+    <br/><span style="color:var(--muted)">usage_tracking：${esc(ex.usage_tracking || "只记录不阻塞")}
+    ｜ never：${esc(ex.never || "此处列出的约束在任何模式下都生效")}</span>`;
+}
+
+function renderStock(s) {
+  if (!s) return "";
+  const cls = s.reached ? "err" : "ok";
+  return `<div class="banner ${cls}">
+    <strong>待预览库存：${s.pending} / ${s.limit}</strong>
+    ${s.reached ? "（已达上限，新增制作会暂停）" : "（未触顶）"}
+    <div class="note">${esc(s.meaning || "")}</div>
+    ${(s.content_ids || []).length
+      ? `<div class="note">相关内容：${s.content_ids.map(c => `<code>${esc(c)}</code>`).join(" ")}</div>` : ""}
+  </div>`;
+}
+
+const load = guard(async () => {
+  const [u, p] = await Promise.all([api.get("/usage"), api.get("/usage/budget-policy")]);
+  renderUsage(u);
+  renderPolicy(p);
+  document.getElementById("policy").insertAdjacentHTML("afterend", renderStock(u.pending_review_stock));
+
+  const s = u.source || {};
+  document.getElementById("source").innerHTML = [
+    ["数据表", `<code>${esc(s.table || "provider_call")}</code>`],
+    ["遗留表", s.legacy ? `<code>${esc(s.legacy)}</code>` : '<span class="missing">无</span>'],
+    ["本次记录的真实调用", `${u.real_calls_recorded ?? 0} 笔`],
+    ["说明", esc(s.note || "")],
+  ].map(([k, v]) => `<div class="kv"><span>${esc(k)}</span><span>${v}</span></div>`).join("");
+
+  log(`用量已加载：总调用 ${u.total_calls} 笔，其中真实调用 ${u.real_calls_recorded} 笔。`);
+});
+
+document.getElementById("btn-check").onclick = guard(async () => {
+  const body = {};
+  const micro = document.getElementById("q-micro").value.trim();
+  const calls = document.getElementById("q-calls").value.trim();
+  if (micro !== "") body.candidate_micro = Number(micro);
+  if (calls !== "") body.calls_so_far = Number(calls);
+  const r = await api.post("/usage/budget-policy/check", body);
+  document.getElementById("check-out").innerHTML =
+    `<pre>${esc(JSON.stringify(r, null, 2))}</pre>`;
+  const allowed = r.allowed ?? r.ok ?? r.result?.allowed;
+  log(`试算完成：${allowed === false ? "不允许（会被拦住）" : "允许"}`,
+      allowed === false ? "err" : "ok");
+});
+
+document.getElementById("status").innerHTML = await statusBar();
+await load();
+log("页面就绪。数据来自 GET /api/v1/usage 与 /usage/budget-policy，只读 provider_call 表。");
+</script>
+</body>
+</html>

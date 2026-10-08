@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>内容工作台 · 反馈下一轮</title>
+<link rel="stylesheet" href="/assets/app.css?v=20261004-discard1" />
+<style>
+  .fb { padding:13px 15px; border-bottom:1px solid var(--line); }
+  .fb:last-child { border-bottom:0; }
+  .fb .hd { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; margin-bottom:5px; }
+  .fb .prop { font-size:13px; font-weight:600; }
+  .fb .why { font-size:11.5px; color:var(--muted); margin-top:3px; }
+  .fb .ev { font-size:11px; color:var(--muted); margin-top:5px; }
+  .fb .btns { display:flex; gap:7px; margin-top:9px; flex-wrap:wrap; }
+  .fb.settled { opacity:.6; }
+  button.ad { color:var(--ok); } button.rj { color:var(--err); } button.rv { color:var(--accent); }
+  .limit { display:flex; gap:10px; align-items:flex-start; padding:9px 0;
+    border-bottom:1px dashed var(--line); font-size:12.5px; }
+  .limit:last-child { border-bottom:0; }
+  .limit .ic { width:20px; text-align:center; flex:none; }
+  .limit .bd { flex:1; }
+  .limit .bd > b { display:block; }
+  .limit .bd > span { color:var(--muted); font-size:11.5px; }
+  select, input, textarea { padding:6px 9px; border:1px solid var(--line); border-radius:7px;
+    background:var(--panel); color:var(--text); font:inherit; font-size:12.5px; }
+  textarea { width:100%; min-height:58px; font-family:inherit; }
+</style>
+<link rel="stylesheet" href="/assets/workbench.css?v=20261005"></head>
+<body>
+<nav class="nav" id="nav"></nav>
+
+<div class="wrap">
+  <h1>反馈下一轮</h1>
+  <div class="sub">P4 · 系统只提候选。<b>建议默认不生效，全部可回退。</b></div>
+
+  <div id="status"></div>
+
+  <div class="banner err">
+    <strong>本页没有任何「自动执行」。</strong>
+    接口声明 <code>auto_apply = false</code>。
+    系统只会把复盘的结论<b>起草成候选</b>，然后停下等人筛。
+    采用、拒绝、回退三个动作都必须由人点。
+  </div>
+
+  <div class="banner warn" id="mag-banner">
+    <strong>只有 tiny / small 允许系统自动采用。</strong>
+    medium / large 即使调用方传 <code>auto = true</code> 也<b>降级为仅候选</b>（不是报错）。
+    所有已采用的改动都保存了原值，<b>随时可回退</b> —— 没有回退动作的自动化不是自动化。
+  </div>
+
+  <h2>概览</h2>
+  <div class="grid" id="overview"></div>
+
+  <h2>待办建议</h2>
+  <div class="hint">
+    这里<b>只列待办</b>。已采用 / 已拒绝 / 已回退的都算已了结，不在待办里 ——
+    否则列表只会越用越长、永远清不掉，人就会开始整片整片地忽略它。
+    已了结的<b>没消失</b>，切换下面的筛选仍可查到。
+  </div>
+  <div class="actions">
+    <select id="sel-status">
+      <option value="">待办（status=proposed）</option>
+      <option value="accepted">已采用</option>
+      <option value="rejected">已拒绝</option>
+      <option value="reverted">已回退</option>
+      <option value="all">全部</option>
+    </select>
+    <button id="btn-refresh">刷新</button>
+  </div>
+  <div class="panel" id="list"></div>
+
+  <h2>下一轮能不能开工</h2>
+  <div class="hint">三条限制<b>并列</b>，任一条触顶就只保存候选，不自动排队。</div>
+  <div class="panel" style="padding:14px 16px;max-width:640px" id="limits"></div>
+  <div id="probe-reasons"></div>
+
+  <h2>幅度门：哪些能自动采用</h2>
+  <div class="panel" id="maggate"></div>
+
+  <h2>把复盘的候选草稿登记成建议</h2>
+  <div class="hint">
+    没有证据引用的建议会被直接拒绝 ——
+    「建议必须给出证据引用（evidence_refs），否则它就不是从数据来的，<b>只是凭空的想法</b>」。
+  </div>
+  <div class="panel" style="padding:14px 16px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px">
+      <div><label class="hint" style="display:block;margin:0 0 3px">复盘报告 review_report_id</label>
+        <input id="f-rid" style="width:100%" placeholder="从「评论与复盘」页复制" /></div>
+      <div><label class="hint" style="display:block;margin:0 0 3px">类型 kind</label>
+        <select id="f-kind" style="width:100%"></select></div>
+      <div><label class="hint" style="display:block;margin:0 0 3px">幅度 magnitude</label>
+        <select id="f-mag" style="width:100%"></select></div>
+      <div><label class="hint" style="display:block;margin:0 0 3px">原值 previous_value</label>
+        <input id="f-prev" style="width:100%" placeholder="回退时恢复这个值" /></div>
+      <div><label class="hint" style="display:block;margin:0 0 3px">新值 new_value</label>
+        <input id="f-new" style="width:100%" /></div>
+    </div>
+    <div style="margin-top:10px"><label class="hint" style="display:block;margin:0 0 3px">建议内容 proposal</label>
+      <input id="f-prop" style="width:100%" placeholder="例如：开头改用提问式" /></div>
+    <div style="margin-top:10px"><label class="hint" style="display:block;margin:0 0 3px">理由 rationale</label>
+      <textarea id="f-why"></textarea></div>
+    <div style="margin-top:10px"><label class="hint" style="display:block;margin:0 0 3px">
+      证据引用 evidence_refs（必填，一行一个 id）</label>
+      <textarea id="f-ev" placeholder="快照 id 或评论 id，一行一个"></textarea></div>
+    <div class="actions">
+      <button class="primary" id="btn-create">登记为建议（默认 proposed）</button>
+      <span class="hint" style="margin:0" id="create-msg"></span>
+    </div>
+  </div>
+
+  <h2>操作日志</h2>
+  <div class="log" id="log"></div>
+</div>
+
+<script type="module">
+import { api, navBar, statusBar, toast, log, guard, esc, stateChip } from "/assets/app.js?v=20261005";
+
+document.getElementById("nav").innerHTML = navBar("FeedbackLoop");
+
+const KIND_LABEL = { topic_weight: "选题权重", angle: "切入角度", format: "呈现形式",
+                     hook: "开头钩子", publish_time: "发布时段", category_focus: "反馈侧重" };
+const MAG_CHIP = { tiny: "ok", small: "ok", medium: "warn", large: "err" };
+const MAG_DESC = { tiny: "补数据、微调发布时段", small: "开头改用提问、选题权重轻微偏移",
+                   medium: "改成测评向、改为长图格式", large: "彻底换赛道" };
+
+let META = { kinds: [], magnitudes: [], auto_adoptable: [], statuses: [] };
+
+function renderOverview(d, batch) {
+  const items = d.items || [];
+  const cards = [
+    { n: d.total ?? 0, l: d.status ? `当前筛选：${d.status}` : "待办建议",
+      cls: (d.total || 0) ? "" : "is-null" },
+    { n: d.settled_total ?? 0, l: "已了结（不在待办里）", cls: "is-null" },
+    { n: (META.kinds || []).length, l: "建议类型", cls: "" },
+    { n: (META.auto_adoptable || []).join(" / ") || "无", l: "可自动采用的幅度", cls: "is-null" },
+  ];
+  if (batch) {
+    cards.push({ n: `${batch.pending_review_stock} / ${batch.pending_review_stock_limit}`,
+      l: "待预览库存", cls: batch.blocked ? "is-warn" : "" });
+  }
+  document.getElementById("overview").innerHTML = cards.map(c =>
+    `<div class="card ${c.cls}"><div class="n">${esc(String(c.n))}</div>
+     <div class="l">${esc(c.l)}</div></div>`).join("");
+}
+
+function renderList(items) {
+  const el = document.getElementById("list");
+  if (!items.length) {
+    el.innerHTML = '<div class="empty">这个筛选下没有建议。</div>';
+    return;
+  }
+  el.innerHTML = items.map(f => {
+    const settled = ["accepted", "rejected", "reverted"].includes(f.status);
+    return `<div class="fb ${settled ? "settled" : ""}">
+      <div class="hd">
+        <span class="prop">${esc(f.proposal)}</span>
+        <span class="chip">${esc(KIND_LABEL[f.kind] || f.kind)}</span>
+        <span class="chip ${MAG_CHIP[f.magnitude] || ""}">幅度 ${esc(f.magnitude)}</span>
+        ${f.auto_adoptable
+          ? '<span class="chip ok">可自动采用</span>'
+          : '<span class="chip warn">需人工确认</span>'}
+        ${stateChip(f.status)}
+        ${f.auto_adopted ? '<span class="chip acc">系统自动采用</span>' : ""}
+      </div>
+      <div class="why">${esc(f.rationale || "")}</div>
+      <div class="ev">证据引用（${(f.evidence_refs || []).length} 条）：${
+        (f.evidence_refs || []).map(r => `<code>${esc(String(r).slice(0, 10))}</code>`).join(" ") || '<span class="missing">无</span>'}</div>
+      ${f.previous_value !== null && f.previous_value !== undefined
+        ? `<div class="ev">当前值 <code>${esc(f.previous_value)}</code> → 建议值 <code>${esc(f.new_value ?? "")}</code>
+             （回退时会恢复 <code>${esc(f.previous_value)}</code>）</div>` : ""}
+      ${f.reject_reason ? `<div class="ev">拒绝理由：${esc(f.reject_reason)}</div>` : ""}
+      ${f.reverted_at ? `<div class="ev">已回退于 ${esc(f.reverted_at)}，原值已恢复。</div>` : ""}
+      <div class="ev">来源复盘 <code>${esc(String(f.review_report_id || "").slice(0, 8))}</code>
+        · 登记于 ${esc(f.created_at || "")}</div>
+      <div class="btns">
+        ${f.status === "proposed" ? `
+          <button class="ad" data-adopt="${esc(f.id)}" data-mag="${esc(f.magnitude)}">采用</button>
+          <button class="rj" data-reject="${esc(f.id)}">拒绝</button>` : ""}
+        ${f.status === "accepted" ? `
+          <button class="rv" data-revert="${esc(f.id)}">回退</button>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+
+  document.querySelectorAll("[data-adopt]").forEach(b => b.onclick = guard(async () => {
+    const auto = ["tiny", "small"].includes(b.dataset.mag);
+    const r = await api.post(`/feedback/${b.dataset.adopt}/adopt`, { auto });
+    const note = r.note || r.downgraded_note || "";
+    log(`采用 ${b.dataset.adopt.slice(0, 8)}（auto=${auto}）：status=${r.status}`
+      + `${r.auto_adopted ? "，系统自动采用" : "，人工采用"}。`, "ok");
+    if (note) log(note, "err");
+    toast(r.status === "proposed" ? "已降级为仅候选（未生效）。" : "已采用，可回退。",
+      r.status === "proposed" ? "err" : "ok");
+    await load();
+  }));
+
+  document.querySelectorAll("[data-reject]").forEach(b => b.onclick = guard(async () => {
+    const reason = prompt("拒绝理由（会一并记录）：", "本期数据不足，暂不调整");
+    if (reason === null) return;
+    const r = await api.post(`/feedback/${b.dataset.reject}/reject`, { reason });
+    log(`已拒绝 ${b.dataset.reject.slice(0, 8)}：${r.status}。理由已记录。`, "ok");
+    await load();
+  }));
+
+  document.querySelectorAll("[data-revert]").forEach(b => b.onclick = guard(async () => {
+    const r = await api.post(`/feedback/${b.dataset.revert}/revert`, {});
+    log(`已回退 ${b.dataset.revert.slice(0, 8)}：原值 ${r.previous_value ?? "（无）"} 已恢复。`, "ok");
+    toast("已回退，原值已恢复。", "ok");
+    await load();
+  }));
+}
+
+function renderLimits(batch, policy) {
+  const nm = policy?.policy?.non_money || {};
+  const lc = batch?.limits_checked || {};
+  const stock = lc.pending_review_stock;
+  const stockLimit = lc.pending_review_stock_limit;
+  const rows = [];
+  rows.push({
+    ok: lc.batch_items === undefined ? null : (lc.batch_items ?? 0) < (nm.item_limit ?? 1),
+    title: `批次条目数：${lc.batch_items ?? "未指定"} / ${nm.item_limit ?? "—"}`,
+    note: lc.batch_items === undefined
+      ? "未指定批次 —— 没有批次范围就没有生产许可（只保存候选）"
+      : "单批默认 1 个内容",
+  });
+  rows.push({
+    ok: (stock === null || stock === undefined || stockLimit === null || stockLimit === undefined)
+      ? null : stock < stockLimit,
+    title: `待预览库存：${stock ?? "—"} / ${stockLimit ?? "—"}`,
+    note: (stock === null || stock === undefined)
+      ? "库存数据未取到；不假装是 0"
+      : (stock >= stockLimit
+          ? "已有产出还没处理完 —— 先处理已存在的产出，本轮只保存候选" : "未触顶"),
+  });
+  const money = policy?.policy?.money || {};
+  const limitNull = money.batch_money_limit_micro === null || money.batch_money_limit_micro === undefined;
+  rows.push({
+    ok: null,
+    title: `金额上限：${limitNull ? "null（未设置）" : money.batch_money_limit_micro}`,
+    note: "null 不阻塞本轮，但也不因此放宽其他两条；null ≠ 零额度，也 ≠ 无限调用",
+  });
+  rows.push({
+    ok: null,
+    title: `单次运行调用上限：${nm.max_calls_per_run ?? "—"} 次`,
+    note: "该限制与是否设置金额上限无关，始终生效",
+  });
+  document.getElementById("limits").innerHTML = rows.map(r =>
+    `<div class="limit">
+       <div class="ic">${r.ok === null ? '<span class="chip">—</span>'
+         : r.ok ? '<span class="chip ok">✓</span>' : '<span class="chip warn">!</span>'}</div>
+       <div class="bd"><b>${esc(r.title)}</b><span>${esc(r.note)}</span></div>
+     </div>`).join("");
+
+  const rsn = document.getElementById("probe-reasons");
+  if (rsn) {
+    rsn.innerHTML = (batch?.reasons || []).length
+      ? `<div class="banner warn" style="margin:10px 0 0">本轮试算结论：${esc(batch.reasons.join("；"))}</div>` : "";
+  }
+}
+
+function renderMagGate() {
+  const auto = META.auto_adoptable || [];
+  document.getElementById("maggate").innerHTML = `
+    <table><thead><tr>
+      <th style="width:14%">幅度</th><th style="width:24%">auto = true</th>
+      <th style="width:22%">auto = false</th><th>典型场景</th></tr></thead><tbody>
+      ${(META.magnitudes || []).map(m => `<tr>
+        <td><span class="chip ${MAG_CHIP[m] || ""}">${esc(m)}</span></td>
+        <td>${auto.includes(m)
+          ? '<b style="color:var(--ok)">自动采用</b>'
+          : '<b style="color:var(--warn)">降级为仅候选</b> + 说明超出范围'}</td>
+        <td>人工采用</td>
+        <td style="color:var(--muted)">${esc(MAG_DESC[m] || "")}</td>
+      </tr>`).join("")}
+    </tbody></table>`;
+}
+
+async function load() {
+  const sel = document.getElementById("sel-status").value;
+  const q = sel ? `?status=${sel}` : "";
+  const d = await api.get("/feedback" + q);
+  META.kinds = d.kinds || META.kinds;
+  META.magnitudes = d.magnitudes || META.magnitudes;
+  META.auto_adoptable = d.auto_adoptable || META.auto_adoptable;
+  META.statuses = d.statuses || META.statuses;
+
+  const [policy, u] = await Promise.all([
+    api.get("/usage/budget-policy").catch(() => null),
+    api.get("/usage").catch(() => null),
+  ]);
+
+  // 批次限制：用一份只读试算拿到当前库存状态
+  let batch = null;
+  try {
+    // 试算：只读。批次 id 传空串，让后端如实回「未指定批次 → 只保存候选」。
+    batch = await api.post("/feedback/batch-proposal", {
+      next_topics: [], batch_id: "",
+      pending_review_stock: (u?.pending_review_stock?.pending ?? 0),
+      pending_review_stock_limit: (u?.pending_review_stock?.limit ?? 3),
+    });
+  } catch (e) { /* 试算失败不影响主列表 */ }
+
+  renderOverview(d, batch);
+  renderList(d.items || []);
+  renderLimits(batch, policy);
+  renderMagGate();
+  if (d.note) log(d.note);
+
+  // 表单选项
+  const ks = document.getElementById("f-kind");
+  const ms = document.getElementById("f-mag");
+  if (!ks.options.length) {
+    ks.innerHTML = (d.kinds || []).map(k =>
+      `<option value="${esc(k)}">${esc(KIND_LABEL[k] || k)}</option>`).join("");
+    ms.innerHTML = (d.magnitudes || []).map(m =>
+      `<option value="${esc(m)}">${esc(m)}${auto0(m, d.auto_adoptable)}</option>`).join("");
+  }
+  document.getElementById("mag-banner").innerHTML =
+    `<strong>只有 ${(d.auto_adoptable || []).join(" / ")} 允许系统自动采用。</strong>
+     medium / large 即使调用方传 <code>auto = true</code> 也<b>降级为仅候选</b>（不是报错）。
+     所有已采用的改动都保存了原值，<b>随时可回退</b>。`;
+}
+
+function auto0(m, auto) { return (auto || []).includes(m) ? "（可自动）" : "（需人工）"; }
+
+const loadWrapped = guard(load);
+
+document.getElementById("sel-status").onchange = loadWrapped;
+document.getElementById("btn-refresh").onclick = guard(async () => {
+  await load(); toast("已刷新。", "ok");
+});
+
+document.getElementById("btn-create").onclick = guard(async () => {
+  const msg = document.getElementById("create-msg");
+  msg.textContent = "";
+  const ev = document.getElementById("f-ev").value.split("\n").map(s => s.trim()).filter(Boolean);
+  const rid = document.getElementById("f-rid").value.trim();
+  if (!rid) { msg.innerHTML = '<span class="missing">缺 review_report_id。</span>'; return; }
+  if (!ev.length) {
+    msg.innerHTML = '<span class="missing">必须给证据引用（evidence_refs）—— 否则这不是从数据来的建议。</span>';
+    return;
+  }
+  const r = await api.post("/feedback", {
+    review_report_id: rid,
+    kind: document.getElementById("f-kind").value,
+    magnitude: document.getElementById("f-mag").value,
+    proposal: document.getElementById("f-prop").value.trim(),
+    rationale: document.getElementById("f-why").value.trim(),
+    evidence_refs: ev,
+    previous_value: document.getElementById("f-prev").value.trim() || null,
+    new_value: document.getElementById("f-new").value.trim() || null,
+    run_mode: (await api.get(`/reviews/${rid}`)).run_mode || "real",
+  });
+  log(`已登记建议 ${String(r.id || "").slice(0, 8)}：status=${r.status}，未生效。`, "ok");
+  toast("已登记为 proposed（未生效）。", "ok");
+  await load();
+});
+
+document.getElementById("status").innerHTML = await statusBar();
+
+// 从「评论与复盘」页带过来的草稿
+const carried = sessionStorage.getItem("cwb.draft");
+if (carried) {
+  sessionStorage.removeItem("cwb.draft");
+  try {
+    const x = JSON.parse(carried);
+    document.getElementById("f-kind").value = x.kind || "";
+    document.getElementById("f-mag").value = x.magnitude || "";
+    document.getElementById("f-prop").value = x.proposal || "";
+    document.getElementById("f-why").value = x.rationale || "";
+    document.getElementById("f-ev").value = (x.evidence_refs || []).join("\n");
+    log("已从「评论与复盘」页带入候选草稿，请确认后再登记。");
+  } catch (e) { /* 忽略 */ }
+}
+
+await loadWrapped();
+log("页面就绪。数据来自 GET /api/v1/feedback；采纳/拒绝/回退三个动作都必须由人点。");
+log(`可自动采用幅度：${META.auto_adoptable.join(" / ")}；medium/large 传 auto=true 会被降级为仅候选。`);
+</script>
+</body>
+</html>

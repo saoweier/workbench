@@ -1,0 +1,21 @@
+{
+  "id": "friendly_guide",
+  "name": "手绘知识海报",
+  "description": "奶油纸、绿色手写标题、便签插画和铅笔分隔，适合亲切的知识讲解",
+  "renderer": "friendly_guide",
+  "version": 3,
+  "forms": [],
+  "style": {
+    "background": "#fff9e9",
+    "ink": "#263e2c",
+    "accent": "#2b704b",
+    "soft": "#e3ebd2",
+    "heading_size": 68,
+    "body_size": 29,
+    "row_spacing": 18,
+    "radius": 24,
+    "heading_font": "handwritten",
+    "decoration": "rich",
+    "design_family": "handdrawn"
+  }
+}

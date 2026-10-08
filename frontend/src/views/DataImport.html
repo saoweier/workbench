@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>内容工作台 · 数据导入</title>
+<link rel="stylesheet" href="/assets/app.css?v=20261004-discard1" />
+<style>
+  .cols { display:grid; grid-template-columns:1.15fr .85fr; gap:16px; }
+  @media (max-width:860px) { .cols { grid-template-columns:1fr; } }
+  textarea { width:100%; min-height:150px; padding:9px 11px; border:1px solid var(--line);
+    border-radius:7px; background:var(--panel); color:var(--text); font:inherit;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; line-height:1.5; }
+  input, select { padding:6px 9px; border:1px solid var(--line); border-radius:7px;
+    background:var(--panel); color:var(--text); font:inherit; font-size:12.5px; }
+  .missing-flag { color:var(--warn); font-style:italic; }
+</style>
+<link rel="stylesheet" href="/assets/workbench.css?v=20261005"></head>
+<body>
+<nav class="nav" id="nav"></nav>
+
+<div class="wrap">
+  <h1>数据导入</h1>
+  <div class="sub">P4 · 平台导出 → 指标快照。<b>一次采集写一条快照，里面装多个指标。</b></div>
+
+  <div id="status"></div>
+
+  <div class="banner warn">
+    <strong>缺失 ≠ 0。</strong>
+    解析不出数字时存 <code>None</code> 并标 <code>value_missing = true</code>，
+    绝不写 0 —— 写 0 会让「没采到」看起来像「确实是 0 播放」，
+    两者在复盘中指向完全相反的动作。
+  </div>
+
+  <h2>导入批次</h2>
+  <div class="hint">
+    幂等键是 <code>(kind, file_hash, mapping_version)</code>。
+    同一个文件再导一次 → <code>idempotent_replay = true</code>，<b>不重复写入</b>。
+    重复的行单独计入 <code>duplicate_rows</code>，<b>不算错误</b>。
+  </div>
+  <div class="grid" id="overview"></div>
+  <div class="panel" style="margin-top:14px"><table>
+    <thead><tr>
+      <th style="width:22%">批次</th><th style="width:10%">状态</th>
+      <th class="num" style="width:8%">总行</th><th class="num" style="width:9%">接受</th>
+      <th class="num" style="width:9%">重复</th><th class="num" style="width:9%">待匹配</th>
+      <th class="num" style="width:8%">错误</th><th class="num" style="width:9%">快照</th>
+      <th>操作</th>
+    </tr></thead>
+    <tbody id="batches"></tbody>
+  </table></div>
+
+  <h2>指标快照明细 <span class="hint" style="display:inline" id="snap-cap"></span></h2>
+  <div class="hint">
+    按 <code>(发布, 时刻, 窗口口径, 流量类型)</code> 分组 ——
+    同一时刻的多个指标进同一条快照，否则复盘时无法回答「这一时刻整体表现如何」。
+  </div>
+  <div id="snaps"><div class="empty">点上面某个批次的「看明细」。</div></div>
+
+  <h2>导入新数据</h2>
+  <div class="cols">
+    <div>
+      <div class="hint">
+        长表格式：每个指标占一行，同一时间戳重复出现。列名映射版本 <code id="mv">v1</code>。
+      </div>
+      <div class="actions">
+        <label>类型 <select id="import-kind"><option value="metrics">指标数据</option><option value="comments">评论样本</option></select></label>
+        <label>数据来源 <select id="import-mode"><option value="fixture">演示数据</option><option value="real">真实数据</option></select></label>
+        <label>上传文件 <input id="upload" type="file" accept=".csv,.json" /></label>
+      </div>
+      <label for="sampling">评论取样说明</label><input id="sampling" placeholder="例如：本次导出的全部评论，或手动抽取 30 条" style="width:100%" />
+      <textarea id="csv">platform,post_id,observed_at,metric_name,value,unit
+douyin,7300000777,2026-10-02T09:00:00,播放量,1.2万,
+douyin,7300000777,2026-10-02T09:00:00,点赞,830,次
+douyin,7300000777,2026-10-02T09:00:00,完播率,42%,</textarea>
+      <div class="actions">
+        <input id="fname" value="douyin-export.csv" style="width:180px" />
+        <select id="fmt"><option value="csv">csv</option><option value="json">json</option></select>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12.5px">
+          <input type="checkbox" id="dry" checked style="width:auto" /> 试算（dry_run）
+        </label>
+        <button class="primary" id="btn-import">导入</button>
+      </div>
+    </div>
+    <div>
+      <div class="hint">标准字段（12 个）。未映射的列如实列出，不猜。</div>
+      <div class="panel" style="padding:12px 14px;font-size:12px" id="fields"></div>
+    </div>
+  </div>
+
+  <div class="banner warn" style="margin-top:16px">
+    <strong>试算（dry_run）绝不留痕。</strong>
+    标着「只试算」的动作<b>不建批次行、不写快照</b>，状态如实报 <code>dry_run</code>、<code>import_id</code> 为空。
+    反例：如果试算也写批次表，会撞上幂等唯一约束，而且会<b>把紧随其后的正式导入一并废掉</b>。
+  </div>
+
+  <h2>导入结果</h2>
+  <div id="outcome"><div class="empty">还没有本次会话的导入结果。</div></div>
+
+  <h2>操作日志</h2>
+  <div class="log" id="log"></div>
+</div>
+
+<script type="module">
+import { api, navBar, statusBar, toast, log, guard, esc, stateChip, num } from "/assets/app.js?v=20261005";
+
+document.getElementById("nav").innerHTML = navBar("DataImport");
+
+const METRIC_LABEL = {
+  views: "播放量", likes: "点赞", comments: "评论", shares: "分享",
+  saves: "收藏", completion_rate: "完播率", followers_gained: "涨粉",
+  duration_sec: "时长", spend: "花费",
+};
+
+function renderOverview(d) {
+  const items = d.items || [];
+  const sum = k => items.reduce((a, x) => a + (x[k] || 0), 0);
+  const cards = [
+    { n: d.total ?? 0, l: "导入批次", cls: (d.total || 0) ? "" : "is-null" },
+    { n: sum("accepted_rows"), l: "累计接受行", cls: sum("accepted_rows") ? "" : "is-null" },
+    { n: sum("duplicate_rows"), l: "累计重复行（不算错误）", cls: "is-null" },
+    { n: sum("unmatched_rows"), l: "累计待匹配（未猜测绑定）",
+      cls: sum("unmatched_rows") ? "is-warn" : "is-null" },
+    { n: sum("error_rows"), l: "累计错误行", cls: sum("error_rows") ? "is-warn" : "is-null" },
+  ];
+  document.getElementById("overview").innerHTML = cards.map(c =>
+    `<div class="card ${c.cls}"><div class="n">${c.n}</div><div class="l">${esc(c.l)}</div></div>`).join("");
+
+  document.getElementById("batches").innerHTML = items.length ? items.map(b => `
+    <tr>
+      <td><code>${esc((b.id || "").slice(0, 8))}…</code><br/>
+        <span class="hint" style="margin:0">${esc(b.file_name || "")}</span></td>
+      <td>${stateChip(b.state)}<br/>
+        <span class="hint" style="margin:0">${esc(b.kind || "")}</span></td>
+      <td class="num">${b.total_rows ?? 0}</td>
+      <td class="num">${b.accepted_rows ?? 0}</td>
+      <td class="num">${b.duplicate_rows ?? 0}</td>
+      <td class="num">${(b.unmatched_rows || 0) > 0
+        ? `<b style="color:var(--warn)">${b.unmatched_rows}</b>` : 0}</td>
+      <td class="num">${(b.error_rows || 0) > 0
+        ? `<b style="color:var(--err)">${b.error_rows}</b>` : 0}</td>
+      <td class="num">${b.snapshot_count ?? 0}</td>
+      <td><button data-detail="${esc(b.id)}">看明细</button></td>
+    </tr>`).join("")
+    : `<tr><td colspan="9" class="empty">还没有导入批次。下面导入一次。</td></tr>`;
+
+  document.querySelectorAll("[data-detail]").forEach(btn =>
+    btn.onclick = guard(async () => {
+      const b = await api.get(`/imports/${btn.dataset.detail}`);
+      renderDetail(b);
+    }));
+}
+
+function renderDetail(b) {
+  document.getElementById("snap-cap").textContent =
+    `— 批次 ${esc((b.id || "").slice(0, 8))} · ${esc(b.file_name || "")} · ${b.snapshot_count || 0} 条快照`;
+  const snaps = b.snapshots || [];
+  const errs = b.errors_detail || {};
+
+  let html = "";
+  if (!snaps.length) {
+    html += '<div class="empty">这个批次没有生成快照。</div>';
+  } else {
+    html = snaps.map(s => {
+      const metrics = Object.entries(s.metrics || {}).map(([name, m]) => {
+        const val = m.value_missing || m.value === null
+          ? `<span class="missing-flag">缺失（value_missing = true）</span>`
+          : `<b>${esc(String(m.value))}</b>`;
+        return `<tr>
+          <td>${esc(METRIC_LABEL[name] || name)} <code>${esc(name)}</code></td>
+          <td>${val} ${esc(m.unit || "")}</td>
+          <td>${esc(m.traffic_type || "")}</td>
+          <td class="hint" style="margin:0">${esc(m.source_row !== undefined ? `第 ${m.source_row} 行` : "")}
+            ${m.raw_metric_name && m.raw_metric_name !== name
+              ? `原始名「${esc(m.raw_metric_name)}」` : ""}</td>
+        </tr>`;
+      }).join("");
+      return `<div class="panel" style="padding:13px 15px;margin-bottom:12px">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:baseline">
+          <b>快照 ${esc((s.id || "").slice(0, 8))}</b>
+          <span class="chip">${esc(s.window_kind || "")}</span>
+          <span class="chip">流量 <code>${esc(s.traffic_type || "")}</code></span>
+          <span class="chip">${esc(s.platform || "")}</span>
+          <span style="color:var(--muted);font-size:12px">
+            ${esc(s.observed_at || "")} · 发布后 ${s.age_hours ?? "—"} 小时</span>
+          ${s.supersedes_id
+            ? `<span class="chip warn">替代了 ${esc(s.supersedes_id.slice(0, 8))}</span>` : ""}
+        </div>
+        <table style="margin-top:9px">
+          <thead><tr><th style="width:34%">指标</th><th style="width:22%">值</th>
+            <th style="width:16%">流量类型</th><th>出处</th></tr></thead>
+          <tbody>${metrics || '<tr><td colspan="4" class="empty">无指标</td></tr>'}</tbody>
+        </table>
+        <div class="hint" style="margin:8px 0 0">平台作品 <code>${esc(s.platform_post_id || "")}</code>
+          · 运行模式 ${esc(s.run_mode || "")}</div>
+      </div>`;
+    }).join("");
+  }
+
+  if ((errs.unmatched || []).length) {
+    html += `<h3>待匹配行（不猜测绑定）</h3><div class="panel"><table>
+      <thead><tr><th style="width:10%">行号</th><th style="width:24%">标识</th>
+        <th>原因</th></tr></thead><tbody>${errs.unmatched.map(u =>
+        `<tr><td>${esc(u.row ?? u.row_number ?? "")}</td>
+          <td><code>${esc(u.post_id || u.platform_post_id || "")}</code></td>
+          <td style="color:var(--muted)">${esc(u.reason || "")}</td></tr>`).join("")}</tbody></table></div>`;
+  }
+  if ((errs.parse_errors || []).length) {
+    html += `<h3>解析错误</h3><div class="panel"><table>
+      <thead><tr><th style="width:10%">行号</th><th>错误</th></tr></thead><tbody>${
+        errs.parse_errors.map(e =>
+        `<tr><td>${esc(e.row ?? "")}</td><td style="color:var(--err)">${
+          esc((e.errors || []).join("；"))}</td></tr>`).join("")}</tbody></table></div>`;
+  }
+  if (b.note) html += `<div class="banner">${esc(b.note)}</div>`;
+  document.getElementById("snaps").innerHTML = html;
+}
+
+function renderOutcome(r) {
+  const parse = r.parse || {};
+  const cards = [
+    { n: r.total_rows ?? 0, l: "总行数", cls: "" },
+    { n: r.accepted_rows ?? 0, l: "已接受", cls: (r.accepted_rows || 0) ? "" : "is-null" },
+    { n: r.duplicate_rows ?? 0, l: "重复（不算错误）", cls: "is-null" },
+    { n: r.unmatched_rows ?? 0, l: "待匹配（未猜测绑定）",
+      cls: (r.unmatched_rows || 0) ? "is-warn" : "is-null" },
+    { n: r.error_rows ?? 0, l: "错误行", cls: (r.error_rows || 0) ? "is-warn" : "is-null" },
+  ];
+  let html = `<div class="grid">${cards.map(c =>
+    `<div class="card ${c.cls}"><div class="n">${c.n}</div><div class="l">${esc(c.l)}</div></div>`).join("")}</div>`;
+
+  html += `<div class="banner ${r.state === "dry_run" ? "warn" : "ok"}" style="margin-top:14px">
+    <strong>状态：<code>${esc(r.state || "")}</code></strong>
+    ${r.idempotent_replay ? ' · <span class="chip warn">幂等重放（未重复写入）</span>' : ""}
+    ${r.state === "dry_run"
+      ? ' · <span class="mode local_seed">试算：未建批次、未写快照、import_id 为空</span>'
+      : ` · 批次 <code>${esc((r.import_id || "").slice(0, 8))}</code>`}
+    <div class="hint" style="margin:5px 0 0">${esc(r.note || "")}</div></div>`;
+
+  if (parse.header || (parse.errors || []).length) {
+    html += `<h3>列映射</h3><div class="panel" style="padding:13px 15px;font-size:12px">
+      <div><b>识别到的表头：</b>${(parse.header || []).map(h => `<code>${esc(h)}</code>`).join(" ") || '<span class="missing">未识别</span>'}</div>
+      <div style="margin-top:6px"><b>已映射：</b>${Object.entries(parse.mapping || {})
+        .map(([src, dst]) => `<code>${esc(src)}→${esc(dst)}</code>`).join(" ") || '<span class="missing">无</span>'}</div>
+      <div style="margin-top:6px"><b>未映射的列：</b>${(parse.unmapped_columns || [])
+        .map(c => `<code>${esc(c)}</code>`).join(" ") || '<span class="missing">无</span>'}</div>
+      <div style="margin-top:6px"><b>解析计数：</b>${parse.ok_count ?? 0} 通过 / ${parse.error_count ?? 0} 错误</div>
+    </div>`;
+  }
+  if ((parse.errors || []).length) {
+    html += `<h3>解析错误（前 ${(parse.errors || []).length} 条）</h3><div class="panel"><table>
+      <thead><tr><th style="width:10%">行号</th><th>错误</th></tr></thead><tbody>${
+        parse.errors.map(e => `<tr><td>${esc(e.row)}</td>
+          <td style="color:var(--err)">${esc((e.errors || []).join("；"))}</td></tr>`).join("")}
+      </tbody></table></div>`;
+  }
+  if ((r.unmatched || []).length) {
+    html += `<h3>待匹配行</h3><div class="panel"><table>
+      <thead><tr><th style="width:10%">行号</th><th style="width:26%">标识</th>
+        <th>原因</th></tr></thead><tbody>${r.unmatched.map(u => `
+        <tr><td>${esc(u.row)}</td>
+          <td><code>${esc(u.platform_post_id || u.post_id || "")}</code></td>
+          <td style="color:var(--muted)">${esc(u.reason || "")}</td></tr>`).join("")}
+      </tbody></table></div>`;
+  }
+  document.getElementById("outcome").innerHTML = html;
+}
+
+const load = guard(async () => {
+  const [d, cats] = await Promise.all([
+    api.get("/imports"),
+    api.get("/seeds").catch(() => null),
+  ]);
+  renderOverview(d);
+  document.getElementById("mv").textContent = d.mapping_version || "v1";
+  document.getElementById("fields").innerHTML =
+    `<div class="hint" style="margin:0 0 8px">${esc(d.note || "")}</div>`
+    + (d.standard_fields || []).map(f =>
+        `<span class="chip" style="margin:2px 3px 2px 0">${esc(f)}</span>`).join("");
+  log(`导入批次 ${d.total} 个；映射版本 ${d.mapping_version}。`);
+});
+
+document.getElementById("btn-import").onclick = guard(async () => {
+  const content = document.getElementById("csv").value;
+  const dry = document.getElementById("dry").checked;
+  if (!content.trim()) { toast("内容为空，没有可导入的行。", "err"); return; }
+  const kind = document.getElementById("import-kind").value;
+  if (kind === "comments" && dry) { toast("评论导入需要取消试算勾选。", "err"); return; }
+  const r = await api.post(kind === "comments" ? "/comments/imports" : "/imports", {
+    kind,
+    run_mode: document.getElementById("import-mode").value,
+    sampling_method: document.getElementById("sampling").value.trim() || null,
+    content,
+    file_name: document.getElementById("fname").value.trim() || "paste.csv",
+    format: document.getElementById("fmt").value,
+    dry_run: dry,
+  });
+  renderOutcome(r);
+  log(`导入完成：state=${r.state}，接受 ${r.accepted_rows} 行，重复 ${r.duplicate_rows} 行，`
+    + `待匹配 ${r.unmatched_rows} 行，错误 ${r.error_rows} 行。`,
+    r.error_rows ? "err" : "ok");
+  if (r.state === "dry_run") {
+    log("试算模式：未建立导入批次、未写入任何快照。正式导入请去掉 dry_run。", "");
+  } else {
+    await load();
+  }
+  for (const u of r.unmatched || []) {
+    log(`第 ${u.row} 行未匹配：${u.reason}（未做任何猜测绑定）`);
+  }
+});
+
+document.getElementById("upload").onchange = guard(async () => {
+  const file = document.getElementById("upload").files[0];
+  if (!file) return;
+  document.getElementById("csv").value = await file.text();
+  document.getElementById("fname").value = file.name;
+  document.getElementById("fmt").value = file.name.endsWith(".json") ? "json" : "csv";
+  document.getElementById("import-mode").value = "real";
+});
+document.getElementById("import-kind").onchange = () => {
+  if (document.getElementById("import-kind").value === "comments") {
+    document.getElementById("csv").value = "platform,post_id,anonymous_comment_id,text,observed_at,like_count\ndouyin,DEMO-005-douyin,sample-comment,这个流程如何开始？,2026-10-03T10:00:00+08:00,3";
+    document.getElementById("import-mode").value = "fixture";
+  }
+};
+document.getElementById("status").innerHTML = await statusBar();
+await load();
+log("页面就绪。数据来自 GET /api/v1/imports；导入走 POST /api/v1/imports。");
+</script>
+</body>
+</html>

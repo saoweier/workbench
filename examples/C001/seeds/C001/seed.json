@@ -1,0 +1,313 @@
+{
+  "schema_version": "seed-c001-v1",
+  "display_id": "C001",
+  "dataset_kind": "project_draft",
+  "run_mode": "local_seed",
+  "topic": "AI 帮我做自媒体，我还得亲自干哪些事？",
+  "content_state": "draft",
+  "media_ready": false,
+  "api_generated_in_app": false,
+  "publication_state": "not_published",
+  "review_decision": null,
+  "brief": {
+    "audience": "希望减少内容制作工作量的个人创作者",
+    "objective": "记录一次图文工作流的设计和后续试验，不预设效果",
+    "voice": "直接、具体、不夸大",
+    "format": "carousel",
+    "production_constraints": [
+      "无需用户预先提供成品或录屏",
+      "文字使用排版层绘制，首版无需生图服务",
+      "方案与目标不可叙述为已经完成的自动化",
+      "只有最终成品进入人工集中预览",
+      "每页信息量需撑住整版，单页正文不少于 60 字（约 4-5 条）"
+    ]
+  },
+  "sources": [
+    {
+      "id": "S01",
+      "kind": "local_planning_document",
+      "path": "../../README.md",
+      "locator": "已确认与暂定；自动推进与异常处理；形式选择：先图文，后视频",
+      "supports": "双平台图文、低人工介入、手动发布的项目设计",
+      "limitations": "这是项目方案，不是实际运营成效证据"
+    },
+    {
+      "id": "S02",
+      "kind": "local_editorial_draft",
+      "path": "../../C001-production-pack.md",
+      "locator": "首轮抖音图文稿；小红书发布草稿；本条的事实边界",
+      "supports": "现有文案和分页方案已经准备",
+      "limitations": "尚无渲染图片、应用运行记录或后台数据"
+    },
+    {
+      "id": "S03",
+      "kind": "local_selection_record",
+      "path": "../../topics.md",
+      "locator": "确认记录",
+      "supports": "已记录用户选择选题 A",
+      "limitations": "选题确认不是成品批准"
+    }
+  ],
+  "claims": [
+    {
+      "id": "C01",
+      "kind": "project_plan",
+      "statement": "先做抖音与小红书图文",
+      "source_ids": [
+        "S01"
+      ]
+    },
+    {
+      "id": "C02",
+      "kind": "document_observation",
+      "statement": "现有选题记录与双平台文案可作开发输入",
+      "source_ids": [
+        "S02",
+        "S03"
+      ]
+    },
+    {
+      "id": "C03",
+      "kind": "project_goal",
+      "statement": "目标是 AI 连续制作检查，人工集中预览并手动发布",
+      "source_ids": [
+        "S01"
+      ]
+    },
+    {
+      "id": "C04",
+      "kind": "planned_measurement",
+      "statement": "之后记录人工用时、打断次数及实际发布数据",
+      "source_ids": [
+        "S01"
+      ]
+    }
+  ],
+  "render_profile": {
+    "name": "editorial-development-default",
+    "version": "1",
+    "width_px": 1080,
+    "height_px": 1440,
+    "format": "png",
+    "platform_upload_verified": false,
+    "note": "仅为便于开发的可调整排版值，不是平台官方规格或上传兼容性证明"
+  },
+  "platform_drafts": [
+    {
+      "platform": "douyin",
+      "title": "让 AI 帮我做自媒体，我还得干什么？",
+      "caption": "把研究、写稿、排版、检查串成一条流程，我只在最后一关看成品。这是第一轮的记录，不是自动化成果发布。",
+      "pages": [
+        {
+          "index": 1,
+          "layout": "cover",
+          "heading": "AI 做自媒体，人还得干什么？",
+          "kicker": "背景",
+          "body": [
+            "第一轮只做图文，视频先不碰",
+            "目标：AI 连着做，我集中看成品",
+            "不看半成品，只做最后一道关",
+            "省下的时间才是真正的产出"
+          ],
+          "footnote": "这轮不追求全自动，只求少打断。",
+          "claim_ids": [
+            "C01"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 2,
+          "layout": "checklist",
+          "heading": "起点不是零，是已有素材",
+          "kicker": "已有素材",
+          "body": [
+            "选题确认记录已经有了，不用重新选",
+            "抖音和小红书的文案结构都写完了",
+            "来源和观点也都对过一遍，能对上号",
+            "唯一缺的一件：把它变成能发的图",
+            "这轮就是补上从文字到成图这一段"
+          ],
+          "footnote": "文案写完了，图还欠着。",
+          "claim_ids": [
+            "C02"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 3,
+          "layout": "checklist",
+          "heading": "我想要的不是全自动",
+          "kicker": "处理原则",
+          "body": [
+            "研究、写稿、排版、检查，这四步交给流程",
+            "中途处理不了的问题先攒着，别一条条打断我",
+            "能自己修的自己修，修不好的统一报给我",
+            "最后一次性看成品，再决定这一版发不发",
+            "我要的是少被打断，不是彻底撒手不管"
+          ],
+          "footnote": "能自己修的自己修，修不了的攒着一起说。",
+          "claim_ids": [
+            "C03"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 4,
+          "layout": "checklist",
+          "heading": "这一轮先把流程跑通",
+          "kicker": "本轮边界",
+          "body": [
+            "把观点说清楚，把每一页排干净就行",
+            "视频和配音这轮不碰，留到下一阶段再说",
+            "发布键还在我手上，不交给机器自动发",
+            "不做定时发布，也不接平台数据回传",
+            "先跑通一条，再谈铺量的事"
+          ],
+          "footnote": "视频、配音、定时发布都不在范围内。",
+          "claim_ids": [
+            "C04"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 5,
+          "layout": "checklist",
+          "heading": "是否省事，靠记录回答",
+          "kicker": "验收方式",
+          "body": [
+            "这轮会被打断几次，如实记下来，不美化",
+            "审核和改稿各花了多少分钟，都记上",
+            "哪些环节还会反复打断我，列成清单",
+            "发布后再看真实数据，现在不急着下结论",
+            "省时省力与否，用记录说话，不用感觉说话"
+          ],
+          "footnote": "用记录说话，不用感觉说话。",
+          "claim_ids": [
+            "C04"
+          ],
+          "asset_ids": []
+        }
+      ]
+    },
+    {
+      "platform": "xiaohongshu",
+      "title": "AI 帮我做自媒体，我还要干什么？",
+      "caption": "一次正在推进的图文工作流试验：从已有文案出发，让流程把图做出来，我只看最后成品。",
+      "pages": [
+        {
+          "index": 1,
+          "layout": "cover",
+          "heading": "AI 帮我做自媒体，我还要干什么？",
+          "kicker": "背景",
+          "body": [
+            "一次正在推进的图文工作流试验",
+            "起点是已经写好的文字稿",
+            "目标是把文字变成能发的图",
+            "我只在最后一关看成品"
+          ],
+          "footnote": "这是记录，不是成果发布。",
+          "claim_ids": [
+            "C01"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 2,
+          "layout": "checklist",
+          "heading": "先把任务说具体",
+          "kicker": "范围",
+          "body": [
+            "平台锁定两个：抖音和小红书，不做别的",
+            "形式锁定一种：先做图文，视频暂时不做",
+            "这轮只做一题两份，把质量做扎实",
+            "不铺量、不追热点，先把一条跑通",
+            "范围收窄是为了先跑通，不是为了做大"
+          ],
+          "footnote": "范围收窄是为了先跑通，不是为了做大。",
+          "claim_ids": [
+            "C02"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 3,
+          "layout": "checklist",
+          "heading": "现有文案就是起点",
+          "kicker": "起点",
+          "body": [
+            "选题已经有确认记录，不用再选一次",
+            "两个平台的文案结构都已经写完了",
+            "来源和观点也对过，能一条条对上号",
+            "但图还没做，所以它现在只能算草稿",
+            "文字算草稿，出了图才算真正的成品"
+          ],
+          "footnote": "文字算草稿，出了图才算成品。",
+          "claim_ids": [
+            "C02"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 4,
+          "layout": "checklist",
+          "heading": "少审核，靠流程做到",
+          "kicker": "处理原则",
+          "body": [
+            "研究、写稿、排版、检查连着跑，不用我盯",
+            "小问题让流程自己修，修不好再交给我",
+            "只让异常和最终成品进到我的视野里",
+            "中间过程不用逐条报，省下我的注意力",
+            "减少打断靠的是流程设计，不是催我快点看"
+          ],
+          "footnote": "减少打断靠的是流程设计，不是催我快点看。",
+          "claim_ids": [
+            "C03"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 5,
+          "layout": "checklist",
+          "heading": "给流程定的三条规矩",
+          "kicker": "规矩",
+          "body": [
+            "在既定方向里推进，不临时换题、不跑偏",
+            "说事实就带来源，没实测就不说亲测",
+            "直接交图片和正文，我预览后手动发布",
+            "数据没出来之前，不写涨粉、不写省时",
+            "规矩先定死，中途不改，避免越跑越偏"
+          ],
+          "footnote": "规矩先定死，中途不改，避免走偏。",
+          "claim_ids": [
+            "C04"
+          ],
+          "asset_ids": []
+        },
+        {
+          "index": 6,
+          "layout": "checklist",
+          "heading": "最后用记录判断值不值",
+          "kicker": "验收方式",
+          "body": [
+            "全程人工一共花了多少时间，记清楚",
+            "哪些环节还会反复打断我，列出来",
+            "拿到发布数据再复盘，现在不承诺结果",
+            "省时、涨粉这类结论，等数据再说",
+            "这一轮先证明流程能跑，不证明效果有多好"
+          ],
+          "footnote": "结论等数据，现在只记过程。",
+          "claim_ids": [
+            "C04"
+          ],
+          "asset_ids": []
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "这是依据本项目已有文档整理的静态内容输入，不是应用自动生成结果",
+    "没有真实 API 消耗、后台数据或发布记录",
+    "来源是项目内部文档，不能作为模型性能或平台传播效果的外部证据",
+    "render_profile 尚未在实际发布界面验证"
+  ]
+}
