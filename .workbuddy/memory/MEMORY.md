@@ -53,6 +53,10 @@
 - DB：`storage/cwb.db`。**该库是 SQLite WAL 模式**，只拷 `cwb.db` 会得到陈旧快照；备份/复刻必须同时拷 `cwb.db-wal` + `cwb.db-shm`。
 - **服务启停只能由用户操作**：Agent 沙箱会在工具调用结束时强制回收所有被 spawn 的子进程（默认 / DETACHED / CREATE_BREAKAWAY_FROM_JOB 实测全被杀），`schtasks.exe` 被程序黑名单拦截。所以 `scripts/launcher.py start` 在 Agent 侧"看起来成功但立刻死"；`stop` 可用。**别人要求重启服务时，直接让用户双击 `start.bat`，不要反复尝试，并如实说明服务当前是否在跑。**
 - 项目自己的服务端口：**8000**（uvicorn + app.worker）。机器上还有别的项目在跑（如 qada_skill:8610），别误杀。
+- **git**：本项目已在 2026-10-08 首次 `git init`，远端 `git@github.com:saoweier/workbench.git`（`origin`，SSH）。三点必知：
+  1. 工程目录 ACL 属主是沙箱账户（`COMPASS/CodexSandboxOffline`），git 会报 `detected dubious ownership`；已加 `safe.directory`。换机器/换目录要重加。
+  2. **`run_in_background` 的 Bash 仍走沙箱**，读 `~/.ssh` 会被拒 → 推送必须**前台 + `dangerouslyDisableSandbox:true`**。
+  3. SSH 到 github.com 通、到 **gitee.com 是 publickey denied**；没有 `gh` CLI 与 API token，**Agent 不能创建远端仓库**，只能推用户已建好的空仓库。提交范围见 `.gitignore` + `.git/info/exclude`（后者排除了 `docs/test-artifacts/`，故意不改 `.gitignore` 以免影响已发布的 zip/sha256）。
 
 ## 已知关注点
 - 题材形态共 7 种：ranking / listicle / tutorial / comparison / review / guide / explainer。
