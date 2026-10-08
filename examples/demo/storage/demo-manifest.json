@@ -1,0 +1,29 @@
+{
+  "fixture": true,
+  "samples": [
+    {
+      "display_id": "DEMO-001",
+      "content_id": "0b9230f4-fe76-4c1b-8906-4b0d2f261e7e"
+    },
+    {
+      "display_id": "DEMO-002",
+      "content_id": "275be607-a4e3-47e9-a880-30662d85c71f"
+    },
+    {
+      "display_id": "DEMO-003",
+      "content_id": "e9cf866d-c32d-4bf5-8c87-ba39ae8f5b76"
+    },
+    {
+      "display_id": "DEMO-004",
+      "content_id": "d3e63b56-b6f0-426d-8a27-0cf23a7ed5b9"
+    },
+    {
+      "display_id": "DEMO-005",
+      "content_id": "2a57133f-1c8a-4195-ad5c-741ce086d6b1"
+    },
+    {
+      "display_id": "DEMO-006",
+      "content_id": "88acef2b-ca68-4d1b-85b9-8cdd479efabd"
+    }
+  ]
+}

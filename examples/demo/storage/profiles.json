@@ -1,0 +1,72 @@
+{
+  "latest": {
+    "douyin": "pp-default-douyin-v1",
+    "xiaohongshu": "pp-default-xiaohongshu-v1"
+  },
+  "versions": [
+    {
+      "id": "pp-default-douyin-v1",
+      "platform": "douyin",
+      "version": 1,
+      "name": "editorial-development-default",
+      "render": {
+        "width_px": 1080,
+        "height_px": 1440,
+        "format": "png",
+        "dpi": 96,
+        "safe_margin_px": 72,
+        "font_family": "Noto Sans CJK SC",
+        "template_versions": [
+          "cover@1",
+          "checklist@1"
+        ]
+      },
+      "limits": {
+        "max_title_chars": 20,
+        "max_caption_chars": 1000,
+        "min_pages": 1,
+        "max_pages": 18,
+        "max_heading_chars": 24,
+        "max_body_chars_per_page": 120,
+        "max_body_lines_per_page": 6
+      },
+      "platform_upload_verified": false,
+      "verification_note": "工程默认排版值，未在实际发布界面核对，不代表平台官方规格或上传兼容性结论",
+      "source": "engineering_default",
+      "created_at": "2026-10-08T01:50:05.732664Z",
+      "superseded_by": null
+    },
+    {
+      "id": "pp-default-xiaohongshu-v1",
+      "platform": "xiaohongshu",
+      "version": 1,
+      "name": "editorial-development-default",
+      "render": {
+        "width_px": 1080,
+        "height_px": 1440,
+        "format": "png",
+        "dpi": 96,
+        "safe_margin_px": 72,
+        "font_family": "Noto Sans CJK SC",
+        "template_versions": [
+          "cover@1",
+          "checklist@1"
+        ]
+      },
+      "limits": {
+        "max_title_chars": 20,
+        "max_caption_chars": 1000,
+        "min_pages": 1,
+        "max_pages": 18,
+        "max_heading_chars": 24,
+        "max_body_chars_per_page": 120,
+        "max_body_lines_per_page": 6
+      },
+      "platform_upload_verified": false,
+      "verification_note": "工程默认排版值，未在实际发布界面核对，不代表平台官方规格或上传兼容性结论",
+      "source": "engineering_default",
+      "created_at": "2026-10-08T01:50:05.732692Z",
+      "superseded_by": null
+    }
+  ]
+}
