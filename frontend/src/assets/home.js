@@ -1,4 +1,4 @@
-import {api,navBar,esc,icon,stateChip,modeChip,guard,toast} from '/assets/app.js?v=20261009-lan1';
+import {api,navBar,esc,icon,stateChip,modeChip,guard,toast} from '/assets/app.js?v=20261009-lan2';
 const $=id=>document.getElementById(id);$('nav').innerHTML=navBar('index');document.querySelectorAll('[data-icon]').forEach(el=>el.innerHTML=icon(el.dataset.icon));
 let contents=[],options=null,health=null,publications=null,count=6,flight=null,epoch=0,observer=null,overviewReady=false;
 const details=new Map();

@@ -1,4 +1,4 @@
-import {api,navBar,esc,guard,toast,uuid} from '/assets/app.js?v=20261009-lan1';
+import {api,navBar,esc,guard,toast,uuid} from '/assets/app.js?v=20261009-lan2';
 const $=id=>document.getElementById(id);$('nav').innerHTML=navBar('SkillWorkflow');
 let packages=[],current=null,versions=[],previewEpoch=0;
 const colors={background:'纸面底色',ink:'正文字色',accent:'标题与重点色',soft:'浅色信息区'};

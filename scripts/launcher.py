@@ -20,6 +20,71 @@ from datetime import datetime,timezone
 ROOT = Path(__file__).resolve().parents[1]
 STATE = ROOT / "storage" / "services.json"
 
+# The workbench is a single-user tool, so the API listens on every interface by
+# default: a workbench only reachable from the machine it runs on is useless for
+# a phone or a second computer on the same network. Pass --host 127.0.0.1 (or set
+# CWB_HOST) to keep it loopback-only again.
+DEFAULT_HOST = os.environ.get("CWB_HOST", "0.0.0.0")
+
+
+def api_command(port, host=None):
+    """The single definition of how the app API is launched."""
+    return ["-m", "uvicorn", "app.main:app",
+            "--host", host or DEFAULT_HOST, "--port", str(port)]
+
+
+def _virtual_address(address):
+    """TUN/proxy/WSL ranges that other devices cannot reach."""
+    if not isinstance(address, str):
+        return True
+    return (address.startswith(("198.18.", "198.19.", "169.254.", "172.26."))
+            or address.startswith(("127.", "0.")))
+
+
+def lan_addresses():
+    """Local IPv4 addresses a phone or second computer can actually open.
+
+    Discovery is best-effort: a machine with no usable adapter must still start.
+    """
+    found = []
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            try:
+                probe.connect(("8.8.8.8", 80))
+                candidate = probe.getsockname()[0]
+            except Exception:
+                candidate = None
+    except Exception:
+        candidate = None
+    for address in ([candidate] if candidate else []) + _resolved_addresses():
+        if address and not _virtual_address(address) and address not in found:
+            found.append(address)
+    return found
+
+
+def _resolved_addresses():
+    try:
+        return [info[4][0] for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)]
+    except Exception:
+        return []
+
+
+def open_urls(port, host):
+    """Everything worth telling the user to open, best-effort."""
+    urls = [f"http://127.0.0.1:{port}/"]
+    if host in ("0.0.0.0", "::"):
+        urls += [f"http://{address}:{port}/" for address in lan_addresses()]
+    elif host not in ("127.0.0.1", "localhost", "::1"):
+        urls.append(f"http://{host}:{port}/")
+    return urls
+
+
+def announce(urls):
+    print("工作台已就绪：" + urls[0])
+    for url in urls[1:]:
+        print("同一局域网的设备也可以打开：" + url)
+
+
 def identity(pid):
     if os.name == "nt":
         from ctypes import wintypes
@@ -98,7 +163,8 @@ def stop(data=None):
     STATE.unlink(missing_ok=True)
     print("本项目服务已停止。")
 
-def start(port, open_browser):
+def start(port, open_browser, host=None):
+    host = host or DEFAULT_HOST
     subprocess.run([sys.executable, str(ROOT / "scripts/doctor.py")], check=True, cwd=ROOT)
     if STATE.exists():
         previous = json.loads(STATE.read_text())
@@ -107,23 +173,23 @@ def start(port, open_browser):
             if h["api"]["instance_id"] == previous["instance_id"] and h["worker"]["status"] == "running":
                 logs=ROOT/'storage'/'logs';logs.mkdir(parents=True,exist_ok=True)
                 ensure_query_service(previous,logs)
-                url = f"http://127.0.0.1:{previous['port']}/"
-                print("项目已运行：" + url)
-                if open_browser: webbrowser.open(url)
+                urls = open_urls(previous['port'], previous.get('host', DEFAULT_HOST))
+                announce(urls)
+                if open_browser: webbrowser.open(urls[0])
                 return
         except Exception:
             pass
         stop(previous)
     with socket.socket() as probe:
-        probe.bind(("127.0.0.1", port))
+        probe.bind((host, port))
     initialize_demo()
     logs = ROOT / "storage" / "logs"
     logs.mkdir(parents=True, exist_ok=True)
     instance = str(uuid.uuid4())
     env = {**os.environ, "PYTHONUTF8": "1", "PYTHONPATH": str(ROOT / "backend"),
            "CWB_INSTANCE_ID": instance}
-    data = {"workspace": str(ROOT), "instance_id": instance, "port": port, "processes": []}
-    commands = [("api", ["-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", str(port)]),
+    data = {"workspace": str(ROOT), "instance_id": instance, "port": port, "host": host, "processes": []}
+    commands = [("api", api_command(port, host)),
                 ("worker", ["-m", "app.worker", "--interval", "2", "--worker-id", instance])]
     try:
         ensure_query_service(data,logs)
@@ -138,9 +204,10 @@ def start(port, open_browser):
             try:
                 h = health(port)
                 if h["api"]["instance_id"] == instance and h["worker"].get("instance_id") == instance and h["worker"]["status"] == "running":
-                    url = f"http://127.0.0.1:{port}/"
-                    print("API、后台任务和工作台已启动：" + url)
-                    if open_browser: webbrowser.open(url)
+                    urls = open_urls(port, host)
+                    print("API、后台任务和工作台已启动。")
+                    announce(urls)
+                    if open_browser: webbrowser.open(urls[0])
                     return
             except Exception:
                 pass
@@ -154,10 +221,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("action", choices=["start", "stop", "status", "restart-worker", "restart-api"])
     parser.add_argument("--port", type=int, default=int(os.environ.get("CWB_PORT", "8000")))
+    parser.add_argument("--host", default=DEFAULT_HOST,
+                        help="API 监听地址，默认 0.0.0.0（同一局域网的设备可访问）；只允许本机时传 127.0.0.1")
     parser.add_argument("--no-browser", action="store_true")
     args = parser.parse_args()
     if args.action == "stop": stop()
-    elif args.action == "start": start(args.port, not args.no_browser)
+    elif args.action == "start": start(args.port, not args.no_browser, args.host)
     elif args.action == 'restart-worker': restart_worker()
     elif args.action == 'restart-api': restart_api()
     else: print(json.dumps(health(args.port), ensure_ascii=False, indent=2))
@@ -166,11 +235,12 @@ def restart_api():
     """Reload only API processes; keep Worker and dedicated account browsers alive."""
     data=json.loads(STATE.read_text(encoding='utf-8'))
     if data.get('workspace')!=str(ROOT):raise RuntimeError('运行记录不属于本项目。')
+    host=data.get('host',DEFAULT_HOST)
     api=next(p for p in data['processes'] if p['name']=='api')
     try:observed=health(data['port'])
     except Exception:
         if identity(api['pid']) is not None:raise RuntimeError('API仍在运行但无法核验身份，未操作任何进程。')
-        with socket.socket() as probe:probe.bind(('127.0.0.1',data['port']))
+        with socket.socket() as probe:probe.bind((host,data['port']))
         observed=None
     if observed:
         if observed['api']['instance_id']!=data['instance_id'] or api['identity'] is None or identity(api['pid'])!=api['identity']:
@@ -197,7 +267,7 @@ def restart_api():
     env={**os.environ,'PYTHONUTF8':'1','PYTHONPATH':str(ROOT/'backend'),'CWB_INSTANCE_ID':data['instance_id']}
     opts={'creationflags':subprocess.CREATE_NO_WINDOW} if os.name=='nt' else {'start_new_session':True}
     with (ROOT/'storage/logs/api.log').open('ab') as output:
-        child=subprocess.Popen([sys.executable,'-m','uvicorn','app.main:app','--host','127.0.0.1','--port',str(data['port'])],cwd=ROOT,env=env,stdin=subprocess.DEVNULL,stdout=output,stderr=output,**opts)
+        child=subprocess.Popen([sys.executable,*api_command(data['port'],host)],cwd=ROOT,env=env,stdin=subprocess.DEVNULL,stdout=output,stderr=output,**opts)
     data['processes']=[p for p in data['processes'] if p['name']!='api']
     data['processes'].insert(0,{'name':'api','pid':child.pid,'identity':identity(child.pid)})
     STATE.write_text(json.dumps(data,indent=2),encoding='utf-8')

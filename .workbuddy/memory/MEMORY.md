@@ -39,7 +39,7 @@
 
 **D. 部署与访问边界**
 24. **访问边界是一个依赖挂 5 个路由**：`app/api/accounts.py` 的 `local_request` 被 `accounts`/`studio`/`content_skills`/`douyin_publishing`/`videos` 共用。2026-10-09 之前要求"客户端回环 + Host 本机名"，导致局域网访问连 `/studio/options` 都 403，前端只显示「创作设置未读取：账号连接只允许本机访问」（**看着像账号坏了，其实是整个应用**）。现行规则：`Settings.allow_remote_access`（`CWB_ALLOW_REMOTE_ACCESS`，默认 **True**）控制非回环客户端；Host 校验保留（本机名 ∪ `CWB_ALLOWED_HOSTS` ∪ 私有/回环/链路本地 **IP 字面量**，只放行 IP 字面量因 DNS rebinding 必须借攻击者域名）；同源 + 拒 `Sec-Fetch-Site: cross-site` + 写操作要求 `X-CWB-Local-Action` 头恒开。**别再把"必须本机客户端"硬编码回来**，收紧用环境变量。
-25. **本机服务默认只绑回环，且后端没有任何登录/鉴权**：`scripts/launcher.py` 写死 `--host 127.0.0.1`（`ensure_query_service` 同）。单用户本地工作台，要对外必须自加反向代理 + 认证。`test_query_startup.py` 只约束 **query 服务**绑回环、`test_operations.py` 只查停止脚本 → 改 app API 绑定地址不破坏测试。离线 wheel 只适用 Windows 64 位 Python 3.13，Linux/macOS 走 `requirements.txt`。
+25. **后端没有任何登录/鉴权，默认监听所有网卡**：`scripts/launcher.py` 的 `DEFAULT_HOST = CWB_HOST or "0.0.0.0"`（2026-10-09 起，之前写死 `127.0.0.1` 导致局域网连不上），`--host` 可覆盖；app API 的命令**只有 `api_command(port, host)` 一个来源**，`start()` 与 `restart_api()` 共用，`restart_api` 沿用 `services.json` 里记录的 host。`ensure_query_service` 仍绑回环（`test_query_startup.py` 有断言）。启动会打印回环 + 内网地址（`lan_addresses()` 跳过 `198.18/198.19/169.254/172.26/127/0` 段，且必须 best-effort 不抛错）。**工作台无鉴权 = 同网段谁都能进**，只在自己用时 `--host 127.0.0.1`。离线 wheel 只适用 Windows 64 位 Python 3.13，Linux/macOS 走 `requirements.txt`。
 26. **`examples/demo/storage/` 必须留在版本控制里**：`.gitignore` 的 `storage/` 任意层级生效会把它排除，而 `launcher.initialize_demo()` 在默认库为空时依赖它（含 `artifacts/` 66 图 + `profiles.json`），缺了启动即失败。复核办法：发布包 zip 条目与 `git ls-files` 做差集。
 27. 真机验证脚本 **`scripts/verify_insecure_origin.py`**：默认起隔离服务（`--host 0.0.0.0` + 临时库）用内网 IP 打开；`--origin http://<内网IP>:8000` 验已跑实例（实例只绑回环时加 `--alias-host` 走 Chromium `--host-resolver-rules`）；自带**反向对照**（换回 `crypto.randomUUID()` 断言能复现报错）。本机内网 IP **10.6.101.1**（探测时跳过 `198.18.0.0/15`、`169.254.0.0/16`、`172.26.0.0/16`）。
 28. **验"正在跑的真实实例"的脚本默认必须只读**：带 `POST /studio/produce` 会在用户真实库里排内容（踩过 C083，只能 discard）。`StaticFiles` 每次请求读磁盘 → 前端改动无需重启，但 `/api/v1/health` 的 `version` 是启动时读的，重启才更新。
@@ -55,7 +55,7 @@
 36. 版本号四处同改：`README.md` 标题、`core/config.py:app_version`、`frontend/src/assets/app.js` 的 `本地工作区 · vX.Y.Z`、`scripts/build_release.py` 的 `OUTPUT` 文件名。发布门禁 = 全量回归 + `scripts/check_release.py <zip>`。
 
 ## 尚未修好
-- 无。**v1.4.2（2026-10-09）全量回归 37 阶段 2570 通过 / 0 失败**（`platform_accounts` 47/0，真机 14/0，反向对照 3/0）。再遇到"红"阶段先区分**断言失败**与**异常退出**（`run_all_tests.py` 对二者都记进失败阶段，但只有后者没有 `阶段统计` 行）。`browser` 里"两页直接创作经完整后台完成"偶发超时（60s 轮询窗口），机器同时在跑用户常驻服务时会这样——断言名已同时打印 `state` 与 `error`，`state` 仍是 queued/running 就是超时。
+- 无。**v1.4.3（2026-10-09）全量回归 37 阶段 2580 通过 / 0 失败**（`browser` 116、`query_startup` 18、`platform_accounts` 47；真机 14/0；发布门禁 10/0）。再遇到"红"阶段先区分**断言失败**与**异常退出**（`run_all_tests.py` 对二者都记进失败阶段，但只有后者没有 `阶段统计` 行）。`browser` 里"两页直接创作经完整后台完成"偶发超时（60s 轮询窗口），机器同时在跑用户常驻服务时会这样——断言名已同时打印 `state` 与 `error`，`state` 仍是 queued/running 就是超时。
 
 ## 运行环境（Windows）
 - Bash 工具在本机不可用（`dirname: command not found`），用 PowerShell 或直接读文件。必须用项目 venv `.venv\Scripts\python.exe`（系统 python 无 pydantic）。PowerShell 标准输出常不回显 → `Set-Content` 写文件再 Read。

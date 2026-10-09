@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CWB_", env_file=".env", extra="ignore")
 
     app_name: str = "内容工作台"
-    app_version: str = "1.4.2"
+    app_version: str = "1.4.3"
     api_prefix: str = "/api/v1"
 
     storage_root: Path = Field(default=PROJECT_ROOT / "storage")
@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     allow_remote_access: bool = True
     # 用反向代理时把代理域名写进来（逗号分隔），否则回环客户端的 Host 校验会拦掉它。
     allowed_hosts: str = ""
+
+    # Optional credentials for approved Douyin Open Platform data scopes.
+    # Keep these in the local, ignored .env file; never expose them via API.
+    douyin_client_key: str | None = Field(default=None, repr=False)
+    douyin_client_secret: str | None = Field(default=None, repr=False)
 
     def extra_allowed_hosts(self) -> set[str]:
         return {h.strip().lower() for h in self.allowed_hosts.split(",") if h.strip()}
