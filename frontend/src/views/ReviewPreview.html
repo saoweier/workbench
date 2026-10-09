@@ -33,7 +33,7 @@
   .kv > span:last-child { color:var(--muted); text-align:right; }
   button.approve { background:var(--ok); border-color:var(--ok); color:#fff; }
 </style>
-<link rel="stylesheet" href="/assets/workbench.css?v=20261005"></head>
+<link rel="stylesheet" href="/assets/workbench.css?v=20261008-insecure1"></head>
 <body>
 <nav class="nav" id="nav"></nav>
 
@@ -112,7 +112,7 @@
 </dialog>
 
 <script type="module">
-import { api, navBar, statusBar, toast, log, guard, esc, stateChip, modeChip, bytes, time } from "/assets/app.js?v=20261005";
+import { api, navBar, statusBar, toast, log, guard, esc, stateChip, modeChip, bytes, time, uuid } from "/assets/app.js?v=20261008-insecure1";
 
 document.getElementById("nav").innerHTML = navBar("ReviewPreview");
 
@@ -473,7 +473,7 @@ async function renderSkillEvidence() {
     if(materials.length<8)throw Error('请先粘贴可读原文或至少一个来源链接');
     const requirements=document.getElementById('blocked-recovery-requirements').value.trim();
     const input={content_id:DETAIL.id,materials,requirements,run_mode:'real'};
-    const signature=JSON.stringify(input);if(RECOVERY_REQUEST?.signature!==signature)RECOVERY_REQUEST={signature,id:crypto.randomUUID()};
+    const signature=JSON.stringify(input);if(RECOVERY_REQUEST?.signature!==signature)RECOVERY_REQUEST={signature,id:uuid()};
     button.disabled=true;
     try{
       const r=await api.post(`/creation/contents/${DETAIL.id}/continue`,{request_id:RECOVERY_REQUEST.id,materials,requirements,run_mode:'real'});
@@ -485,7 +485,7 @@ async function renderSkillEvidence() {
   document.getElementById('skill-audit').onclick=guard(async()=>{
     const button=document.getElementById('skill-audit');button.disabled=true;
     const input={base_revision_id:requireRev().revision_id,requirements:document.getElementById('revision-requirements').value,run_mode:document.getElementById('revision-mode').value};
-    const signature=JSON.stringify(input);if(AUDIT_REQUEST?.signature!==signature)AUDIT_REQUEST={signature,id:crypto.randomUUID()};
+    const signature=JSON.stringify(input);if(AUDIT_REQUEST?.signature!==signature)AUDIT_REQUEST={signature,id:uuid()};
     try {const r=await api.post(`/contents/${DETAIL.id}/skill-audit`,{...input,request_id:AUDIT_REQUEST.id});
       document.getElementById('skill-audit-result').innerHTML=`<h3>${r.report.passed?'审核建议：可继续人工预览':'审核建议：需要调整'}</h3><p>${esc(r.report.summary)}</p>${r.report.issues.map(i=>`<p><b>${esc(i.problem)}</b><br>${esc(i.suggestion)}</p>`).join('')}<p class="hint">${esc(r.notice)}</p>`;await renderSkillEvidence();
     }finally{button.disabled=false;}
@@ -505,7 +505,7 @@ async function renderSkillEvidence() {
       }else{
         if(mode!=='real')throw Error('整篇自主重做请使用AI模型；本地模式可选择标题或正文，并填写“改为：新内容”');
         const input={base_revision_id:base,instruction:requirements,materials:document.getElementById('revision-materials').value,run_mode:mode,media_ids:REVISION_MEDIA.map(m=>m.id),template_id:template||null,direction:direction||null};
-        const signature=JSON.stringify(input);if(REVISION_REQUEST?.signature!==signature)REVISION_REQUEST={signature,id:crypto.randomUUID()};
+        const signature=JSON.stringify(input);if(REVISION_REQUEST?.signature!==signature)REVISION_REQUEST={signature,id:uuid()};
         const r=await api.post(`/studio/contents/${DETAIL.id}/revise`,{...input,request_id:REVISION_REQUEST.id});
         const url=new URL(location.href);url.searchParams.set('run',r.run_id);history.replaceState({},'',url);watchIllustration(r.run_id,DETAIL.id);
       }

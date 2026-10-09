@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CWB_", env_file=".env", extra="ignore")
 
     app_name: str = "内容工作台"
-    app_version: str = "1.4.0"
+    app_version: str = "1.4.1"
     api_prefix: str = "/api/v1"
 
     storage_root: Path = Field(default=PROJECT_ROOT / "storage")

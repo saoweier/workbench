@@ -1,5 +1,5 @@
-import {api,navBar,esc,stateChip,modeChip,toast,guard,icon,time} from '/assets/app.js?v=20261005';
-import {setupDirectCreator} from '/assets/direct-creator.js?v=20261006-submission';
+import {api,navBar,esc,stateChip,modeChip,toast,guard,icon,time} from '/assets/app.js?v=20261008-insecure1';
+import {setupDirectCreator} from '/assets/direct-creator.js?v=20261008-insecure1';
 const $=id=>document.getElementById(id);
 $('nav').innerHTML=navBar('Production');
 document.querySelectorAll('[data-icon]').forEach(el=>el.innerHTML=icon(el.dataset.icon));
@@ -122,10 +122,18 @@ async function loadRuns({background=false}={}){
 }
 $('tasks-refresh').onclick=()=>loadRuns();$('tasks-more').onclick=()=>{runCount+=15;renderRuns();};
 $('runs').onclick=guard(async e=>{const b=e.target.closest('[data-control]');if(!b||b.disabled)return;b.disabled=true;try{await api.post('/runs/'+encodeURIComponent(b.dataset.control)+'/control',{action:b.dataset.action});await loadRuns();}finally{b.disabled=false;}});
-async function loadTools(){if(toolsReady)return;if(toolLoad)return toolLoad;$('tools-content').innerHTML=skeleton();toolLoad=(async()=>{try{const [response,module]=await Promise.all([fetch('/assets/production-tools.html?v=20261005'),import('/assets/production-tools.js?v=20261005')]);if(!response.ok)throw Error('工具页面读取失败');$('tools-content').innerHTML=await response.text();await module.setupTools({refresh:async()=>{await loadRuns();libraryLoaded=false;}});toolsReady=true;}
+async function loadTools(){if(toolsReady)return;if(toolLoad)return toolLoad;$('tools-content').innerHTML=skeleton();toolLoad=(async()=>{try{const [response,module]=await Promise.all([fetch('/assets/production-tools.html?v=20261008-insecure1'),import('/assets/production-tools.js?v=20261008-insecure1')]);if(!response.ok)throw Error('工具页面读取失败');$('tools-content').innerHTML=await response.text();await module.setupTools({refresh:async()=>{await loadRuns();libraryLoaded=false;}});toolsReady=true;}
   catch(e){$('tools-content').innerHTML=`<div class="state-empty"><h3>工具暂时未能载入</h3><p>${esc(e.message)}</p><button id="tools-retry">重新载入</button></div>`;$('tools-retry').onclick=()=>loadTools();}finally{toolLoad=null;}})();return toolLoad;}
 document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if(!document.hidden&&(pane==='tasks'||guide?.hasTask()))loadRuns({background:true});});
-guide=await setupDirectCreator({onQueued:async()=>{libraryLoaded=false;await loadRuns();}});
+// 「新建创作」是整页的主入口。它一旦在初始化阶段抛错，页面就永远停在
+// 「读取创作设置」上，而用户只看到一次瞬时提示（生产环境实际遇到过：
+// 用 http://内网IP:8000 打开时 crypto.randomUUID 不存在）。这里改成
+// 显示可读原因，并让「我的内容 / 制作任务 / 高级工具」页签照常可用。
+try{guide=await setupDirectCreator({onQueued:async()=>{libraryLoaded=false;await loadRuns();}});}
+catch(e){guide={hasTask:()=>false,hasActiveTask:()=>false,updateRuns:()=>{}};
+  $('creator-model').textContent='创作设置未能载入';
+  $('creator-error').textContent='创作设置读取失败：'+(e?.message||e)+'。请刷新重试；若一直失败，改用 http://localhost:8000 打开，或把当前地址配成 HTTPS。';
+  toast('创作设置未能载入，原因已显示在「新建创作」里','err');}
 const initial=new URL(location.href).searchParams.get('pane')||'create';await showPane(initial);
 if(guide.hasTask())await loadRuns();
 document.addEventListener('creator-task-changed',()=>{schedule();});

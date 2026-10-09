@@ -1,4 +1,4 @@
-import {api,navBar,esc,guard,toast} from '/assets/app.js?v=20261005';
+import {api,navBar,esc,guard,toast,uuid} from '/assets/app.js?v=20261008-insecure1';
 const $=id=>document.getElementById(id);$('nav').innerHTML=navBar('SkillWorkflow');
 let packages=[],current=null,versions=[],previewEpoch=0;
 const colors={background:'纸面底色',ink:'正文字色',accent:'标题与重点色',soft:'浅色信息区'};
@@ -46,7 +46,7 @@ $('template-form').onsubmit=guard(async e=>{
  }finally{$('save-template').disabled=false;}
 });
 $('duplicate-template').onclick=guard(async()=>{
- current={...read(),id:'tpl_'+crypto.randomUUID().replaceAll('-','').slice(0,12),name:($('template-name').value+' · 副本').slice(0,36)};
+ current={...read(),id:'tpl_'+uuid().replaceAll('-','').slice(0,12),name:($('template-name').value+' · 副本').slice(0,36)};
  list();fill(current);await history();await preview();$('template-name').focus();$('template-message').textContent='已复制到编辑器。改好名字、规则和外观后保存，即可在创作室使用。';
 });
 $('preview-template').onclick=guard(preview);

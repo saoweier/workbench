@@ -1,4 +1,4 @@
-import {api,esc,time} from '/assets/app.js?v=20261005';
+import {api,esc,time} from '/assets/app.js?v=20261008-insecure1';
 const acquisition=r=>r?.search_executed?'已执行资料搜索':r?.search_trace?.some(t=>t.tool==='read_selected_topic'&&t.state==='ok')?'已读取热榜原链接，未执行补充搜索':'未执行资料搜索';
 const json=value=>`<pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto">${esc(JSON.stringify(value,null,2))}</pre>`;
 export async function renderDiagnostics(el,id){

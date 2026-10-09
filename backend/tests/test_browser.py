@@ -204,7 +204,10 @@ try:
             guide_run=get('/runs/'+guide_task['run_id'])
             if guide_run['state'] in {'succeeded','failed','paused'}:break
             page.wait_for_timeout(500)
-        check("两页直接创作经完整后台完成："+str(guide_run.get('error')),guide_run['state']=='succeeded')
+        # 注意"没到终态"和"失败"是两回事：state 还是 queued/running 说明 60s 预算不够
+        # （机器同时在跑别的服务时会这样），而 failed 一定带 error。把两者都写进断言名里。
+        check("两页直接创作经完整后台完成：state=%s error=%s" % (guide_run['state'], guide_run.get('error')),
+              guide_run['state']=='succeeded')
         detail=get('/contents/'+guide_task['content_id'])
         check("用户原题未被换成推荐角度",detail['topic']==picked)
         rev=next(r for r in detail['revisions'] if r['revision_id']==detail['active_revision_id'])
@@ -330,6 +333,72 @@ try:
               not page_errors(errors))
         page.goto(url+'/');page.locator('.content-card').first.wait_for()
         page.screenshot(path=str(proof/"mobile.png"),full_page=True)
+
+        # 生产环境常被用 http://内网IP:8000 打开 —— 那不是安全上下文
+        # （isSecureContext=false），crypto.randomUUID / navigator.clipboard
+        # 在这些地址上根本不存在。direct-creator.js 曾在模块求值时就调
+        # crypto.randomUUID，于是整页抛出 TypeError，用户看到的是
+        # 「读取创作设置的时候卡住了」（页面里只留下 crypto.randomUUID is not a function）。
+        # 这里用一个新 context 把这两个 API 拿掉，模拟真实的生产访问地址。
+        insecure=browser.new_context(viewport={"width":1440,"height":1000})
+        insecure.add_init_script(
+            "Object.defineProperty(globalThis,'isSecureContext',{value:false,configurable:true});"
+            "try{delete Crypto.prototype.randomUUID;}catch(e){}"
+            "try{Object.defineProperty(navigator,'clipboard',{value:undefined,configurable:true});}catch(e){}")
+        insecure_errors=[]
+        insecure_page=insecure.new_page()
+        insecure_page.set_default_timeout(15000)
+        insecure_page.on("pageerror",lambda e:insecure_errors.append(str(e)))
+        insecure_page.goto(url+"/views/Production.html")
+        # 这条要放在最前面：万一模拟没生效，后面的断言全会"因为环境是安全的"而假过。
+        check("模拟生效：该上下文确实没有 crypto.randomUUID",
+              insecure_page.evaluate("()=>typeof globalThis.crypto.randomUUID")=="undefined")
+        insecure_page.get_by_role('button',name='自定义选题',exact=True).click()
+        expect(insecure_page.locator('#creator-topic')).to_be_visible()
+        check("非安全上下文下创作设置能读出来、不卡住"
+              +("："+" | ".join(e[:160] for e in page_errors(insecure_errors)) if page_errors(insecure_errors) else ""),
+              not page_errors(insecure_errors))
+        check("非安全上下文下仍生成合法 UUID（后端把 request_id 声明为 UUID）",
+              insecure_page.evaluate("async()=>{const m=await import('/assets/app.js?v=20261008-insecure1');"
+                  "return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(m.uuid());}"))
+        check("剪贴板不可用时复制走回退且不抛错",
+              insecure_page.evaluate("async()=>{const m=await import('/assets/app.js?v=20261008-insecure1');"
+                  "if(m.canWriteClipboard())return false;return typeof await m.copyText('复制回退测试')==='boolean';}"))
+        insecure_page.goto(url+f"/views/ReviewPreview.html?content={demo['id']}")
+        insecure_page.wait_for_function("document.querySelectorAll('img').length > 0 && [...document.querySelectorAll('img')].some(i=>i.naturalWidth>0)")
+        check("非安全上下文下预览页也能加载并恢复调整入口"
+              +("："+" | ".join(e[:160] for e in page_errors(insecure_errors)) if page_errors(insecure_errors) else ""),
+              not page_errors(insecure_errors) and not insecure_page.locator('#revision-submit').is_disabled())
+        # 上面修的是"初始化不再抛错"。万一将来又冒出别的初始化异常，页面也不能永远
+        # 停在「读取创作设置」——必须给出可读原因，并让其他页签照常可用。
+        # 注意 production.js 是**静态** import 创作模块的，模块本身加载失败连
+        # production.js 都评估不了，那是不可捕获的；用户实际遇到的栈是
+        # blank → setupDirectCreator → production.js:128，属于"模块已加载、调用时抛错"。
+        # 所以这里换成一个全新 context（缓存干净），把创作模块替换成"调用即抛错"的桩。
+        degraded=browser.new_context(viewport={"width":1440,"height":1000})
+        degraded.route("**/assets/direct-creator.js*", lambda r: r.fulfill(
+            status=200, content_type="application/javascript",
+            body="export async function setupDirectCreator(){throw new Error('模拟创作设置初始化失败');}"))
+        degraded_page=degraded.new_page()
+        degraded_page.set_default_timeout(15000)
+        degraded_page.goto(url+"/views/Production.html")
+        recovered=False
+        try:
+            degraded_page.wait_for_function(
+                "()=>document.querySelector('#creator-error')?.textContent.includes('创作设置读取失败')",
+                timeout=8000)
+            recovered=True
+        except Exception:pass
+        reason=(degraded_page.locator('#creator-error').text_content() or "").strip()
+        check("创作设置初始化失败时给出可读原因而不是一直转圈"
+              +(("：%s" % reason[:70]) if recovered else "（实际提示：%s）" % (reason or "（空，一直停在「读取创作设置」）")),
+              recovered and '模拟创作设置初始化失败' in reason)
+        check("创作设置初始化失败时状态条写明未能载入",
+              '创作设置未能载入' in degraded_page.locator('#creator-model').inner_text())
+        degraded_page.get_by_role('tab',name='制作任务',exact=False).click()
+        check("创作设置初始化失败不影响其他页签", degraded_page.locator('#tasks-refresh').is_visible())
+        degraded.close()
+        insecure.close()
         browser.close()
 finally:
     for process in reversed(processes):

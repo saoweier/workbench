@@ -1,4 +1,4 @@
-import {api, navBar} from '/assets/app.js?v=20261005';
+import {api, navBar} from '/assets/app.js?v=20261008-insecure1';
 
 document.getElementById('nav').innerHTML = navBar('PlatformAccounts');
 const byId = id => document.getElementById(id);

@@ -107,6 +107,54 @@ export function time(iso) {
   return isNaN(d) ? esc(iso) : d.toLocaleString("zh-CN", { hour12: false });
 }
 
+/* ------------------------------------------------------- 安全上下文兼容层 */
+
+/**
+ * 只有 https:// 与 http://localhost(127.0.0.1) 才算安全上下文。用
+ * `http://内网IP:8000` 打开时 isSecureContext 为 false，`crypto.randomUUID`、
+ * `crypto.subtle`、`navigator.clipboard` 统统不存在，直接调用会抛 TypeError。
+ * 后端把 request_id / request_key 声明为 UUID，所以替代实现必须产出合法 UUID v4。
+ */
+export function uuid() {
+  const c = globalThis.crypto;
+  if (typeof c?.randomUUID === "function") return c.randomUUID();
+  const bytes = c?.getRandomValues
+    ? c.getRandomValues(new Uint8Array(16))
+    : Uint8Array.from({ length: 16 }, () => Math.floor(Math.random() * 256));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map(b => b.toString(16).padStart(2, "0")).join("");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+/** 当前页面能不能静默写剪贴板（非安全上下文或用户拒绝时不可用）。 */
+export const canWriteClipboard = () => !!globalThis.navigator?.clipboard?.writeText;
+
+/**
+ * 复制文本。剪贴板 API 不可用时退回「选中文本」，由用户手动 Ctrl+C。
+ * 返回 true 表示系统剪贴板已写入；false 表示只做了选中。
+ */
+export async function copyText(text) {
+  if (canWriteClipboard()) {
+    try { await navigator.clipboard.writeText(text); return true; } catch { /* 退回选中 */ }
+  }
+  const node = document.createElement("textarea");
+  node.value = text;
+  node.setAttribute("readonly", "");
+  node.style.position = "fixed";
+  node.style.top = "-1000px";
+  node.style.opacity = "0";
+  document.body.appendChild(node);
+  node.select();
+  try {
+    return typeof document.execCommand === "function" && document.execCommand("copy");
+  } catch {
+    return false;
+  } finally {
+    node.remove();
+  }
+}
+
 export const MODE_LABEL = { real: "真实调用", fixture: "契约演练", local_seed: "项目资料" };
 
 export function modeChip(m) {
@@ -213,7 +261,7 @@ export function navBar(current) {
     <details class="nav-extra" ${['ManualPublishing','Publications','PlatformAccounts','DouyinPublishing','DataImport'].includes(current)?'open':''}><summary>发布工具与记录</summary>${group('', ['ManualPublishing','PlatformAccounts','DouyinPublishing','Publications','DataImport'])}</details>
     ${group('工作区', ['QueryLab','ApiSettings','Attention'])}
     <details class="nav-extra" ${['UsageCosts','SkillWorkflow'].includes(current)?'open':''}><summary>技能与用量</summary>${group('', ['SkillWorkflow','UsageCosts'])}</details>
-    <div class="nav-footer"><div class="local-note">本地工作区 · v1.4.0</div>
+    <div class="nav-footer"><div class="local-note">本地工作区 · v1.4.1</div>
       <div class="workspace-person"><span class="avatar">创</span><div><strong>我的创作空间</strong><small>让好内容，持续发生</small></div></div>
     </div>`;
 }
