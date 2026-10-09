@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -139,7 +140,10 @@ def main() -> int:
             if not lan_ip:
                 print("未能探测到内网 IPv4，请用 --lan-ip 指定。")
                 return 2
-            origin, api_base, procs, logs, tmp = accept_isolated_service(lan_ip)
+            origin, _loopback, procs, logs, tmp = accept_isolated_service(lan_ip)
+            # 接口探测与提交校验也走非本机来源，顺带覆盖访问边界
+            # （走回环地址只能证明服务可用，证明不了"局域网能不能用"）。
+            api_base = origin
             print(f"隔离服务已起：{origin}")
         print(f"--- 访问来源：{origin}")
 
@@ -162,11 +166,34 @@ def main() -> int:
             page.get_by_role("button", name="自定义选题", exact=True).click()
             page.locator("#creator-topic").wait_for(state="visible")
             page.wait_for_timeout(600)
+            # 注意：只断言"不是「读取创作设置」"是不够的 —— 后端返回 403 时界面会显示
+            # "服务暂不可用 / 创作设置未读取：…"，那种降级状态同样"不是读取创作设置"，
+            # 会假通过。这里要求状态条是正常的加载结果，且没有错误提示、表单已启用。
             status = page.locator("#creator-model").inner_text()
-            check(f"创作设置读出来了，不再卡在「读取创作设置」（状态条：{status}）",
-                  "读取创作设置" not in status)
+            check(f"创作设置真的读出来了（状态条：{status}）",
+                  ("创作搭档" in status or "本地演练" in status)
+                  and "读取创作设置" not in status and "暂不可用" not in status)
+            error_text = (page.locator("#creator-error").text_content() or "").strip()
+            check("没有「创作设置未读取」之类的错误提示"
+                  + (f"（实际：{error_text[:100]}）" if error_text else "（无提示）"),
+                  not error_text)
+            check("创作表单已启用，能继续操作", not page.locator("#creator-ready").is_disabled())
             check("打开创作页无脚本异常" + ("：" + " | ".join(e[:200] for e in errors) if errors else ""),
                   not errors)
+
+            # 用非本机来源直接点名几个受访问边界保护的接口。这几个路由都挂了同一个
+            # 访问边界依赖，一旦"局域网被拦"回潮，这里会立刻指出来，而不是靠页面上的
+            # 一句含糊提示。
+            probe_host = api_base.split("//", 1)[-1].split(":", 1)[0]
+            if not re.match(r"^\d+\.\d+\.\d+\.\d+$", probe_host):
+                print(f"跳过接口探测（{probe_host} 在 Python 侧不一定能解析，可用 --api 指定可直连地址）")
+            else:
+                if probe_host in {"127.0.0.1", "localhost"}:
+                    print("注意：接口探测走的是回环地址，只证明服务可用，不覆盖访问边界")
+                for path in ["/studio/options", "/accounts/douyin", "/content-skills", "/video-presenters"]:
+                    response = client.get(api_base + "/api/v1" + path)
+                    check(f"非本机来源可访问 {path}（HTTP {response.status_code}）",
+                          response.status_code == 200)
 
             # 草稿 key 由 uuid() 生成；后端把 request_id 声明为 UUID，必须是合法 UUID v4。
             page.locator("#creator-topic").fill("内网来源可用性验证")

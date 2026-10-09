@@ -1,4 +1,4 @@
-import {api,esc,guard,toast,uuid} from '/assets/app.js?v=20261008-insecure1';
+import {api,esc,guard,toast,uuid} from '/assets/app.js?v=20261009-lan1';
 const $=id=>document.getElementById(id),KEY='cwb.direct.creator.v2';
 const blank=()=>({key:uuid(),topic:'',requirements:'',density:'balanced',style:'clean',pages:'2',direction:'auto',templateId:'auto',platforms:['douyin','xiaohongshu'],materials:'',mediaIds:[],trendId:null,trendSource:null,task:null,category:'hot',entrySource:null,boardSource:null,boardPage:0,step:0});
 export async function setupDirectCreator({onQueued}){

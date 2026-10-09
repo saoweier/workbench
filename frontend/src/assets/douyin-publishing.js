@@ -1,4 +1,4 @@
-import {api, navBar, esc} from '/assets/app.js?v=20261008-insecure1';
+import {api, navBar, esc} from '/assets/app.js?v=20261009-lan1';
 const $ = id => document.getElementById(id);
 $('nav').innerHTML = navBar('DouyinPublishing');
 const states = {planned:'图文准备已保存', upload_requested:'等待上传', uploading:'正在上传图文', awaiting_editor:'正在核对编辑页',

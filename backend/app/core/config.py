@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="CWB_", env_file=".env", extra="ignore")
 
     app_name: str = "内容工作台"
-    app_version: str = "1.4.1"
+    app_version: str = "1.4.2"
     api_prefix: str = "/api/v1"
 
     storage_root: Path = Field(default=PROJECT_ROOT / "storage")
@@ -37,6 +37,17 @@ class Settings(BaseSettings):
 
     # 密钥保存位置（不落库明文）
     secret_store_path: Path = Field(default=PROJECT_ROOT / "storage" / "secrets.json")
+
+    # 访问边界（详见 app/api/accounts.py:local_request）
+    # 非回环客户端默认放行：服务能收到这种请求，就说明运维方已经把它绑到了可被访问的
+    # 地址（只绑 127.0.0.1 时远程根本连不上）。要恢复"只允许本机"，设
+    # CWB_ALLOW_REMOTE_ACCESS=false。
+    allow_remote_access: bool = True
+    # 用反向代理时把代理域名写进来（逗号分隔），否则回环客户端的 Host 校验会拦掉它。
+    allowed_hosts: str = ""
+
+    def extra_allowed_hosts(self) -> set[str]:
+        return {h.strip().lower() for h in self.allowed_hosts.split(",") if h.strip()}
 
     def ensure_dirs(self) -> None:
         for d in (self.storage_root, self.artifact_dir, self.tmp_dir):

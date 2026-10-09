@@ -1,4 +1,4 @@
-import {api,esc,guard,toast,log} from '/assets/app.js?v=20261008-insecure1';
+import {api,esc,guard,toast,log} from '/assets/app.js?v=20261009-lan1';
 export async function setupTools({refresh}) {
 let BATCH=null, SEED_PATH=null;
 const produce = guard(async () => {

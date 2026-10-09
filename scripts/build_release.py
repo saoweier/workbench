@@ -4,7 +4,7 @@ import hashlib
 import json
 import zipfile
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT.parent / "content-workbench-v1.4.1-20261008.zip"
+OUTPUT = ROOT.parent / "content-workbench-v1.4.2-20261009.zip"
 
 def main():
     names=["README.md","requirements.txt","requirements-lock.txt",".gitignore","install.bat","start.bat","stop.bat","test.bat"]

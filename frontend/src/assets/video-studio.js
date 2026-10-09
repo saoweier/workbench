@@ -1,4 +1,4 @@
-import {api,navBar,esc,uuid} from './app.js?v=20261008-insecure1';
+import {api,navBar,esc,uuid} from './app.js?v=20261009-lan1';
 import {drawPreview,loadImage} from './video-preview.js';
 const $=id=>document.getElementById(id);
 $('nav').innerHTML=navBar('VideoStudio');

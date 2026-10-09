@@ -1,6 +1,8 @@
-"""Account connection contracts, browser lifecycle and local-only boundaries.
+"""Account connection contracts, browser lifecycle and access boundaries.
 
 No real login, model call, publishing or cookie export occurs in this test.
+Access boundary: same-origin + anti-CSRF + anti-DNS-rebinding are always enforced;
+"loopback client only" is configurable and off by default since 2026-10-09.
 """
 from datetime import datetime, timezone
 import json
@@ -46,7 +48,34 @@ check("different port blocked", client.post("/api/v1/accounts/douyin/connect", h
 check("missing action header blocked", client.post("/api/v1/accounts/douyin/connect").status_code == 403)
 check("cross-site browser blocked", client.post("/api/v1/accounts/douyin/connect", headers={**headers,"Sec-Fetch-Site":"cross-site"}).status_code == 403)
 check("DNS rebinding host blocked", client.get("/api/v1/accounts/douyin", headers={"Host":"evil.invalid"}).status_code == 403)
-check("remote client blocked", TestClient(app, client=("192.0.2.1", 123)).get("/api/v1/accounts/douyin").status_code == 403)
+# 2026-10-09 起：非回环客户端默认放行，否则局域网/内网里其它设备打开工作台会到处 403
+# （用户实际遇到的是 /studio/options 被拦，界面显示"创作设置未读取：账号连接只允许本机访问"）。
+# 依据：只绑 127.0.0.1 时远程根本连不上，能收到非回环请求本身就说明运维方主动暴露了服务。
+lan = TestClient(app, client=("10.0.0.7", 45231), base_url="http://10.0.0.5:8000")
+lan_origin = {"Origin": "http://10.0.0.5:8000"}
+check("LAN client allowed by default", lan.get("/api/v1/accounts/douyin", headers=lan_origin).status_code == 200)
+check("LAN client can read creator settings",
+      lan.get("/api/v1/studio/options").status_code == 200)
+check("LAN client can reach content skills and video studio",
+      lan.get("/api/v1/content-skills").status_code == 200
+      and lan.get("/api/v1/video-presenters").status_code == 200)
+check("LAN client still needs the workbench action header for writes",
+      lan.post("/api/v1/accounts/douyin/connect", headers=lan_origin).status_code == 403)
+check("LAN client still blocked on foreign origin",
+      lan.get("/api/v1/accounts/douyin", headers={"Origin":"https://evil.invalid"}).status_code == 403)
+check("LAN client still blocked as cross-site",
+      lan.post("/api/v1/accounts/douyin/connect", headers={**lan_origin,"Sec-Fetch-Site":"cross-site"}).status_code == 403)
+check("LAN client cannot smuggle a foreign host into the rebinding check",
+      lan.get("/api/v1/accounts/douyin", headers={"Host":"evil.invalid"}).status_code == 403)
+from app.core.config import get_settings
+_previous = get_settings().allow_remote_access
+get_settings().allow_remote_access = False
+try:
+    check("CWB_ALLOW_REMOTE_ACCESS=false restores the local-only boundary",
+          lan.get("/api/v1/accounts/douyin", headers=lan_origin).status_code == 403
+          and client.get("/api/v1/accounts/douyin").status_code == 200)
+finally:
+    get_settings().allow_remote_access = _previous
 dashboard = "首页\n内容管理\n数据中心\n账号设置"
 check("landing page never sufficient", classify_login(DOUYIN_URL, dashboard) == "unverified")
 check("login page remains waiting", classify_login(DOUYIN_URL, "扫码登录\n首页\n内容管理\n数据中心") == "waiting_login")

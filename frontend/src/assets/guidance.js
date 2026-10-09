@@ -1,4 +1,4 @@
-import {api,esc} from '/assets/app.js?v=20261008-insecure1';
+import {api,esc} from '/assets/app.js?v=20261009-lan1';
 import {LESSONS,GUIDE_VERSION} from '/assets/guidance-lessons.js?v=20261006';
 const KEY='cwb.guidance.v4',DRAFT='cwb.direct.creator.v2';
 export function setupGuidance(){
