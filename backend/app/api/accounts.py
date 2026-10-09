@@ -2,21 +2,26 @@
 
 这里只保留**真正有意义**的约束，并把"必须是本机客户端"改成可配置的：
 
-1. **同源**：`Origin` 必须与请求自身来源一致（挡住别的站点借用户浏览器发起的调用）。
+1. **同源**：`Origin` 的 host:port 必须与请求自身来源一致。只比 host:port，不比方案——
+   反向代理终止 TLS 时浏览器看到 `https`、应用看到 `http`，那不是跨站。
 2. **拒绝跨站**：`Sec-Fetch-Site: cross-site` 直接拒绝。
 3. **写操作必须带工作台自定义头**：浏览器对跨源自定义头会先发预检，等于再加一道闸。
-4. **Host 必须是本机名或私有 IP 字面量**：这条不是"麻烦"，而是防 **DNS rebinding** ——
-   恶意站点把自己的域名解析到用户的内网/回环地址，就能借用户浏览器以"同源"姿态调
-   本机 API。此时 Host 是攻击者的**域名**，会被这条挡下。
+4. **Host 必须是 IP 字面量、本机自己的名字、或 `CWB_ALLOWED_HOSTS` 里列出的名字**：这条不是
+   "麻烦"，而是防 **DNS rebinding** —— 恶意站点把自己的域名解析到用户的内网/回环地址，
+   就能借用户浏览器以"同源"姿态调本机 API。此时 Host 是攻击者的**域名**，会被这条挡下。
 
 关于"本机"（2026-10-09 起放宽）：
 - **非回环客户端**默认放行。服务能收到这种请求，本身就说明运维方已经把它绑到了可被
   访问的地址（只绑 127.0.0.1 时远程根本连不上），再按客户端 IP 拦只是把内网访问打死。
   要恢复旧的"只允许本机"，设 `CWB_ALLOW_REMOTE_ACCESS=false`。
-- **回环客户端**仍要求 Host 是本机名；用反向代理时把代理域名写进 `CWB_ALLOWED_HOSTS`，
-  否则 Host 是代理域名会被第 4 条拦掉。
+- **本机自己的机器名**（含短名与 `.local`）默认放行，见 `config.local_host_names()`。用
+  `http://<机器名>:8000` 打开工作台不该整个 403。
+- 自己的域名 / 反向代理域名要写进 `CWB_ALLOWED_HOSTS`。被拦时 403 文案会直接写出当前
+  Host，照它说的加即可，不用去猜。
 """
 from ipaddress import ip_address
+from urllib.parse import urlsplit
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..core.config import get_settings
@@ -48,17 +53,32 @@ def _is_private_host_literal(hostname: str) -> bool:
     return address.is_private or address.is_loopback or address.is_link_local
 
 
+def _host_rejection(hostname: str) -> str:
+    """把被拒的 Host 直接写进文案，用户照着做即可，不用来猜是哪条规则。"""
+    return (f"当前地址「{hostname}」不被接受：只允许 IP 地址、本机的机器名，"
+            "以及 CWB_ALLOWED_HOSTS 里列出的名字。如果这是你自己的域名，"
+            "把它写进 CWB_ALLOWED_HOSTS 再重启服务。")
+
+
+def _origin_endpoint(value: str) -> str:
+    """取来源的 host:port。方案不参与比较：反向代理终止 TLS 时浏览器是 https、
+    应用看到 http，那不是跨站。"""
+    parsed = urlsplit(value)
+    return (parsed.netloc or parsed.path).lower()
+
+
 def local_request(request: Request) -> None:
     settings = get_settings()
     hostname = (request.url.hostname or "").lower()
-    if hostname not in (BASE_ALLOWED_HOSTS | settings.extra_allowed_hosts()) \
+    if hostname not in BASE_ALLOWED_HOSTS | settings.trusted_host_names() \
             and not _is_private_host_literal(hostname):
-        raise HTTPException(403, "请从本机工作台打开账号连接。")
+        raise HTTPException(403, _host_rejection(hostname))
     if not _is_loopback_client(request) and not settings.allow_remote_access:
         raise HTTPException(403, "账号连接只允许本机访问（已通过 CWB_ALLOW_REMOTE_ACCESS=false 关闭非本机访问）。")
     origin = request.headers.get("origin")
-    if origin and origin.rstrip("/") != str(request.base_url).rstrip("/"):
-        raise HTTPException(403, "请从本机工作台打开账号连接。")
+    if origin and _origin_endpoint(origin) != _origin_endpoint(str(request.base_url)):
+        raise HTTPException(403, f"页面来源「{origin}」与工作台地址「{str(request.base_url).rstrip('/')}」不一致，"
+                                 "请直接在浏览器里打开工作台地址，不要经由其它站点或改写 Host 的代理。")
     if request.headers.get("sec-fetch-site") == "cross-site":
         raise HTTPException(403, "不允许跨站访问账号连接。")
     if request.method != "GET" and request.headers.get("x-cwb-local-action") != "account-connection":

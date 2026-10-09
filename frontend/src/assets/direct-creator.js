@@ -1,4 +1,4 @@
-import {api,esc,guard,toast,uuid} from '/assets/app.js?v=20261009-lan2';
+import {api,esc,guard,toast,uuid} from '/assets/app.js?v=20261009-lan3';
 const $=id=>document.getElementById(id),KEY='cwb.direct.creator.v2';
 const blank=()=>({key:uuid(),topic:'',requirements:'',density:'balanced',style:'clean',pages:'2',direction:'auto',templateId:'auto',platforms:['douyin','xiaohongshu'],materials:'',mediaIds:[],trendId:null,trendSource:null,task:null,category:'hot',entrySource:null,boardSource:null,boardPage:0,step:0});
 export async function setupDirectCreator({onQueued}){
@@ -109,7 +109,14 @@ export async function setupDirectCreator({onQueued}){
   $('creator-inspect').onclick=()=>{$('creator-compose').hidden=!$('creator-compose').hidden;document.querySelector('.wizard-steps').hidden=$('creator-compose').hidden;if(!$('creator-compose').hidden)showStep(2);else paintTaskAside();};
   document.addEventListener('visibilitychange',()=>{clearTimeout(boardTimer);if(!document.hidden&&!$('creator-board').hidden&&step===0&&boardData?.refreshing)boards();});
   restore();
-  let options;try{options=await api.get('/studio/options');}catch(e){$('creator-ready').disabled=false;$('creator-start').disabled=true;$('creator-model').textContent='服务暂不可用';$('creator-error').textContent='创作设置未读取：'+e.message+'。恢复服务后刷新页面，输入会保留。';return controller();}$('creator-direction').innerHTML=(options.directions||[{id:'auto',name:'自动识别'}]).map(d=>`<option value="${esc(d.id)}">${esc(d.name)}</option>`).join('');if(!(options.directions||[]).some(d=>d.id===draft.direction))draft.direction='auto';$('creator-direction').value=draft.direction;
+  let options;try{options=await api.get('/studio/options');}catch(e){
+    const detail=(e&&e.message)||'';
+    const denied=e&&e.status===403;
+    $('creator-ready').disabled=false;$('creator-start').disabled=true;
+    $('creator-model').textContent=denied?'当前地址无法访问':'服务暂不可用';
+    $('creator-error').textContent=denied?detail:'创作设置未读取：'+detail+'。恢复服务后刷新页面，输入会保留。';
+    return controller();
+  }$('creator-direction').innerHTML=(options.directions||[{id:'auto',name:'自动识别'}]).map(d=>`<option value="${esc(d.id)}">${esc(d.name)}</option>`).join('');if(!(options.directions||[]).some(d=>d.id===draft.direction))draft.direction='auto';$('creator-direction').value=draft.direction;
   if(!(options.templates||[]).some(t=>t.id===draft.templateId))draft.templateId='auto';
   $('creator-templates').innerHTML=(options.templates||[{id:'auto',name:'自动匹配',description:'依据内容选择版式'}]).map(t=>`<div class="creator-template"><button data-template="${esc(t.id)}" aria-pressed="${draft.templateId===t.id}">${t.id==='auto'?'<span class="template-mini" aria-hidden="true"><b>按内容自动选海报</b><i></i><i></i><i></i></span>':`<span class="template-mini template-poster" aria-hidden="true"><iframe src="/api/v1/studio/template-preview/${esc(t.id)}?v=${esc(t.package_version)}" loading="lazy" title="${esc(t.name)}固定示例" sandbox="allow-scripts" tabindex="-1"></iframe></span>`}<strong>${esc(t.name)}</strong><small>${esc(t.description)}</small></button>${t.id!=='auto'?`<a href="/api/v1/studio/template-preview/${esc(t.id)}" target="_blank" rel="noopener">放大海报示例 ↗</a>`:''}</div>`).join('');
   const posterObserver=new ResizeObserver(entries=>entries.forEach(({target,contentRect})=>{if(contentRect.width>0)target.style.setProperty('--mini-scale',String(contentRect.width/1080));}));

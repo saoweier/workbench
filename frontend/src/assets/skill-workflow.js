@@ -1,5 +1,5 @@
 import {renderDiagnostics} from '/assets/content-diagnostics.js?v=deliverables-20261007';
-import {api,navBar,statusBar,esc,guard,toast,time} from '/assets/app.js?v=20261009-lan2';
+import {api,navBar,statusBar,esc,guard,toast,time} from '/assets/app.js?v=20261009-lan3';
 document.getElementById('nav').innerHTML=navBar('SkillWorkflow');
 document.getElementById('status').innerHTML=await statusBar();
 const skills=await api.get('/content-skills');

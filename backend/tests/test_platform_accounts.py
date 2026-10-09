@@ -76,6 +76,42 @@ try:
           and client.get("/api/v1/accounts/douyin").status_code == 200)
 finally:
     get_settings().allow_remote_access = _previous
+# 2026-10-09 用户实测反馈：用 http://<机器名>:8000 打开时报"创作设置未读取：请从本机工作台打开账号连接"。
+# 根因是 Host 校验只认 IP 字面量和 localhost，机器名被当成"外来域名"拒了。机器名由本机/局域网解析
+# 决定，不是外部 DNS 能指过来的，放行它不会给 DNS rebinding 开口子。
+import socket
+machine = socket.gethostname().lower()
+machine_short = machine.split(".")[0]
+by_name = TestClient(app, client=("10.0.0.7", 45231), base_url=f"http://{machine}:8000")
+allowed_hosts = get_settings().allowed_hosts
+try:
+    check("本机机器名不被当成外来域名",
+          by_name.get("/api/v1/studio/options").status_code == 200
+          and by_name.get("/api/v1/accounts/douyin",
+                          headers={"Origin": f"http://{machine}:8000"}).status_code == 200)
+    check("机器名短名与 .local 同样可用",
+          TestClient(app, base_url=f"http://{machine_short}.local:8000").get(
+              "/api/v1/studio/options").status_code == 200)
+    check("explainer page reachable by machine name",
+          by_name.get("/views/PlatformAccounts.html").status_code == 200)
+    # 被拒时必须把当前 Host 写进文案，用户照着加即可，不用来猜是哪条规则。
+    rejected = by_name.get("/api/v1/studio/options", headers={"Host": "cwb.example.com"})
+    check("外来域名仍然被拦下并报出当前地址",
+          rejected.status_code == 403
+          and "cwb.example.com" in rejected.json()["detail"]
+          and "CWB_ALLOWED_HOSTS" in rejected.json()["detail"])
+    get_settings().allowed_hosts = "cwb.example.com"
+    check("CWB_ALLOWED_HOSTS 能放行自己的域名",
+          by_name.get("/api/v1/studio/options", headers={"Host": "cwb.example.com"}).status_code == 200)
+finally:
+    get_settings().allowed_hosts = allowed_hosts
+# 反向代理终止 TLS 时浏览器看到 https、应用看到 http，那不是跨站，不该拦。
+check("同主机不同方案不算跨站",
+      by_name.get("/api/v1/studio/options",
+                  headers={"Origin": f"https://{machine}:8000"}).status_code == 200)
+check("同主机不同端口仍然是跨站",
+      by_name.get("/api/v1/studio/options",
+                  headers={"Origin": f"http://{machine}:9999"}).status_code == 403)
 dashboard = "首页\n内容管理\n数据中心\n账号设置"
 check("landing page never sufficient", classify_login(DOUYIN_URL, dashboard) == "unverified")
 check("login page remains waiting", classify_login(DOUYIN_URL, "扫码登录\n首页\n内容管理\n数据中心") == "waiting_login")

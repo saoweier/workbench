@@ -261,7 +261,7 @@ export function navBar(current) {
     <details class="nav-extra" ${['ManualPublishing','Publications','PlatformAccounts','DouyinPublishing','DataImport'].includes(current)?'open':''}><summary>发布工具与记录</summary>${group('', ['ManualPublishing','PlatformAccounts','DouyinPublishing','Publications','DataImport'])}</details>
     ${group('工作区', ['QueryLab','ApiSettings','Attention'])}
     <details class="nav-extra" ${['UsageCosts','SkillWorkflow'].includes(current)?'open':''}><summary>技能与用量</summary>${group('', ['SkillWorkflow','UsageCosts'])}</details>
-    <div class="nav-footer"><div class="local-note">本地工作区 · v1.4.2</div>
+    <div class="nav-footer"><div class="local-note">本地工作区 · v1.4.4</div>
       <div class="workspace-person"><span class="avatar">创</span><div><strong>我的创作空间</strong><small>让好内容，持续发生</small></div></div>
     </div>`;
 }

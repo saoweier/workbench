@@ -359,10 +359,10 @@ try:
               +("："+" | ".join(e[:160] for e in page_errors(insecure_errors)) if page_errors(insecure_errors) else ""),
               not page_errors(insecure_errors))
         check("非安全上下文下仍生成合法 UUID（后端把 request_id 声明为 UUID）",
-              insecure_page.evaluate("async()=>{const m=await import('/assets/app.js?v=20261009-lan2');"
+              insecure_page.evaluate("async()=>{const m=await import('/assets/app.js?v=20261009-lan3');"
                   "return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(m.uuid());}"))
         check("剪贴板不可用时复制走回退且不抛错",
-              insecure_page.evaluate("async()=>{const m=await import('/assets/app.js?v=20261009-lan2');"
+              insecure_page.evaluate("async()=>{const m=await import('/assets/app.js?v=20261009-lan3');"
                   "if(m.canWriteClipboard())return false;return typeof await m.copyText('复制回退测试')==='boolean';}"))
         insecure_page.goto(url+f"/views/ReviewPreview.html?content={demo['id']}")
         insecure_page.wait_for_function("document.querySelectorAll('img').length > 0 && [...document.querySelectorAll('img')].some(i=>i.naturalWidth>0)")

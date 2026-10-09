@@ -34,11 +34,16 @@
 19. 前端模块多为动态 import，点击前要等挂载（如 `expect(#guide-hub).to_be_attached()` 是可靠就绪信号）。"单独跑能过、全量跑挂"优先怀疑这种竞态。
 20. 交付物清单等接口调用要能降级：`content-diagnostics.js` 在报错或非清单结构时显示原因，不能直接取 `deliverables.acceptance.passed`（桩数据缺路径会炸页面）。
 21. 非安全上下文（`http://内网IP`）下 `crypto.randomUUID`/`navigator.clipboard`/`crypto.subtle` 不存在。前端一律用 `app.js` 的 `uuid()`/`copyText()`；`uuid()` 用 `crypto.getRandomValues` 拼合法 UUID v4（后端 `request_id` 声明为 `UUID`）。
-22. **改任何前端文件必须同时换它的 `?v=` 缓存 token**，改 `app.js` 尤其要动（所有模块共用同一 URL 引它）。检查残留：`grep -ro "?v=[0-9a-z-]*" frontend/src | sort | uniq -c`。测试不受影响（服务端忽略查询串，`test_p5_e2e.page_sources()` 会剥 `?v=`）。
+22. **改任何前端文件必须同时换它的 `?v=` 缓存 token**，改 `app.js` 尤其要动（所有模块共用同一 URL 引它）。检查残留：`grep -ro "?v=[0-9a-z-]*" frontend/src | sort | uniq -c`。测试不受影响（服务端忽略查询串，`test_p5_e2e.page_sources()` 会剥 `?v=`）。**注意 `app.js` 自身不含 `?v=`**：用"grep 带旧 token 的文件再批量替换"的办法会漏掉它（踩过：v1.4.3 提交漏了 app.js，仓库里版本号还停在 v1.4.2）。版本号四处同改时要**显式 `git add` app.js**，改完核对 `git show HEAD:<file>`。
 23. 改导航条 `NAV` 必须同步 `test_browser.py` 的 `views` 列表与 `ready` 映射。
 
 **D. 部署与访问边界**
-24. **访问边界是一个依赖挂 5 个路由**：`app/api/accounts.py` 的 `local_request` 被 `accounts`/`studio`/`content_skills`/`douyin_publishing`/`videos` 共用。2026-10-09 之前要求"客户端回环 + Host 本机名"，导致局域网访问连 `/studio/options` 都 403，前端只显示「创作设置未读取：账号连接只允许本机访问」（**看着像账号坏了，其实是整个应用**）。现行规则：`Settings.allow_remote_access`（`CWB_ALLOW_REMOTE_ACCESS`，默认 **True**）控制非回环客户端；Host 校验保留（本机名 ∪ `CWB_ALLOWED_HOSTS` ∪ 私有/回环/链路本地 **IP 字面量**，只放行 IP 字面量因 DNS rebinding 必须借攻击者域名）；同源 + 拒 `Sec-Fetch-Site: cross-site` + 写操作要求 `X-CWB-Local-Action` 头恒开。**别再把"必须本机客户端"硬编码回来**，收紧用环境变量。
+24. **访问边界是一个依赖挂 5 个路由**：`app/api/accounts.py` 的 `local_request` 被 `accounts`/`studio`/`content_skills`/`douyin_publishing`/`videos` 共用。**两道闸都踩过"整个应用 403、前端只说一句含糊话"的坑**（看着像账号坏了）。现行规则：
+   - **Host 白名单** = `BASE_ALLOWED_HOSTS`（localhost/127.0.0.1/::1/testserver）∪ `Settings.trusted_host_names()`（`CWB_ALLOWED_HOSTS` ∪ `config.local_host_names()` 本机机器名/短名/`.local`）∪ 私有/回环/链路本地 **IP 字面量**。只放行 IP 字面量＋本机自己的名字是刻意的：DNS rebinding 必须借攻击者的**域名**，机器名由本机/局域网解析决定，指不过来。（踩过：只放行 IP 字面量 → `http://<机器名>:8000` 整个 403。）
+   - **Origin 只比 host:port，不比方案**：反向代理终止 TLS 时浏览器是 https、应用是 http，那不是跨站。
+   - 非回环客户端由 `CWB_ALLOW_REMOTE_ACCESS` 控制（默认 **True**）；拒 `Sec-Fetch-Site: cross-site`、写操作要 `X-CWB-Local-Action` 头恒开。
+   - **403 文案必须写出被拒的 Host/Origin 与该改哪个环境变量**；前端 `direct-creator.js` 对 403 如实显示原因（别再说"服务暂不可用"）。
+   - 收紧用环境变量，**别把"必须本机客户端"硬编码回来**。
 25. **后端没有任何登录/鉴权，默认监听所有网卡**：`scripts/launcher.py` 的 `DEFAULT_HOST = CWB_HOST or "0.0.0.0"`（2026-10-09 起，之前写死 `127.0.0.1` 导致局域网连不上），`--host` 可覆盖；app API 的命令**只有 `api_command(port, host)` 一个来源**，`start()` 与 `restart_api()` 共用，`restart_api` 沿用 `services.json` 里记录的 host。`ensure_query_service` 仍绑回环（`test_query_startup.py` 有断言）。启动会打印回环 + 内网地址（`lan_addresses()` 跳过 `198.18/198.19/169.254/172.26/127/0` 段，且必须 best-effort 不抛错）。**工作台无鉴权 = 同网段谁都能进**，只在自己用时 `--host 127.0.0.1`。离线 wheel 只适用 Windows 64 位 Python 3.13，Linux/macOS 走 `requirements.txt`。
 26. **`examples/demo/storage/` 必须留在版本控制里**：`.gitignore` 的 `storage/` 任意层级生效会把它排除，而 `launcher.initialize_demo()` 在默认库为空时依赖它（含 `artifacts/` 66 图 + `profiles.json`），缺了启动即失败。复核办法：发布包 zip 条目与 `git ls-files` 做差集。
 27. 真机验证脚本 **`scripts/verify_insecure_origin.py`**：默认起隔离服务（`--host 0.0.0.0` + 临时库）用内网 IP 打开；`--origin http://<内网IP>:8000` 验已跑实例（实例只绑回环时加 `--alias-host` 走 Chromium `--host-resolver-rules`）；自带**反向对照**（换回 `crypto.randomUUID()` 断言能复现报错）。本机内网 IP **10.6.101.1**（探测时跳过 `198.18.0.0/15`、`169.254.0.0/16`、`172.26.0.0/16`）。
@@ -53,9 +58,10 @@
 34. 排查"请求没生效"先看测试临时库：测试用 `tempfile.mkdtemp('cwb-skills-')` 建库且不清理，sqlite 只读打开 `test.db` 看 `event` 表有无 `change_requested`/`*_enqueued`、`platform_revision` 有几个版本。表名是**单数**（`content_item`/`content_revision`/`platform_revision`），`content_revision` 无 `state` 列、`event` 时间列叫 `time`。
 35. **用 `Write` 整体重写已有文件前先完整读一遍**：重写 `accounts.py` 时只读前 45 行，丢了 `/accounts/douyin/close` 端点。要么完整读、要么局部 Edit，改完用 `git show HEAD:<file>` 对比关键结构（`@router` 列表）。
 36. 版本号四处同改：`README.md` 标题、`core/config.py:app_version`、`frontend/src/assets/app.js` 的 `本地工作区 · vX.Y.Z`、`scripts/build_release.py` 的 `OUTPUT` 文件名。发布门禁 = 全量回归 + `scripts/check_release.py <zip>`。
+37. **这个工作区可能同时有别人/别的会话在写，`git add -A` 会把别人的半成品一起提交**（踩过：提交 `config.py` 时夹带了别人正在加的 `douyin_client_key/secret` 字段；同一批还出现过 `douyin_platform_source.py`、`test_douyin_hotsearch.py`、`run_all_tests.py` 新阶段，几分钟后又被对方回退）。提交前：`git status --short` **全量**看（别 `head` 截断）、`ls --time-style=+%H:%M` 看 mtime 对不上自己的操作时间就查、对可疑文件 `git diff HEAD -- <file>`；**只 `git add` 自己列出的路径，不要用 `-A`**。跑全量回归也要注意：对方改了 `run_all_tests.py` 的 STAGES 就得把阶段名显式列出来（可从 `git show HEAD:scripts/run_all_tests.py` 取）。
 
 ## 尚未修好
-- 无。**v1.4.3（2026-10-09）全量回归 37 阶段 2580 通过 / 0 失败**（`browser` 116、`query_startup` 18、`platform_accounts` 47；真机 14/0；发布门禁 10/0）。再遇到"红"阶段先区分**断言失败**与**异常退出**（`run_all_tests.py` 对二者都记进失败阶段，但只有后者没有 `阶段统计` 行）。`browser` 里"两页直接创作经完整后台完成"偶发超时（60s 轮询窗口），机器同时在跑用户常驻服务时会这样——断言名已同时打印 `state` 与 `error`，`state` 仍是 queued/running 就是超时。
+- 无。**v1.4.4（2026-10-09）全量回归 37 阶段 2587 通过 / 0 失败**（`browser` 116、`platform_accounts` 54、`query_startup` 18；真机 14/0 ×2（内网 IP + 机器名）；发布门禁 10/0）。再遇到"红"阶段先区分**断言失败**与**异常退出**（`run_all_tests.py` 对二者都记进失败阶段，但只有后者没有 `阶段统计` 行）。`browser` 里"两页直接创作经完整后台完成"偶发超时（60s 轮询窗口），机器同时在跑用户常驻服务时会这样——断言名已同时打印 `state` 与 `error`，`state` 仍是 queued/running 就是超时。
 
 ## 运行环境（Windows）
 - Bash 工具在本机不可用（`dirname: command not found`），用 PowerShell 或直接读文件。必须用项目 venv `.venv\Scripts\python.exe`（系统 python 无 pydantic）。PowerShell 标准输出常不回显 → `Set-Content` 写文件再 Read。

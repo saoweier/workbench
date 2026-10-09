@@ -1,5 +1,5 @@
-import {api,navBar,esc,stateChip,modeChip,toast,guard,icon,time} from '/assets/app.js?v=20261009-lan2';
-import {setupDirectCreator} from '/assets/direct-creator.js?v=20261009-lan2';
+import {api,navBar,esc,stateChip,modeChip,toast,guard,icon,time} from '/assets/app.js?v=20261009-lan3';
+import {setupDirectCreator} from '/assets/direct-creator.js?v=20261009-lan3';
 const $=id=>document.getElementById(id);
 $('nav').innerHTML=navBar('Production');
 document.querySelectorAll('[data-icon]').forEach(el=>el.innerHTML=icon(el.dataset.icon));
@@ -122,7 +122,7 @@ async function loadRuns({background=false}={}){
 }
 $('tasks-refresh').onclick=()=>loadRuns();$('tasks-more').onclick=()=>{runCount+=15;renderRuns();};
 $('runs').onclick=guard(async e=>{const b=e.target.closest('[data-control]');if(!b||b.disabled)return;b.disabled=true;try{await api.post('/runs/'+encodeURIComponent(b.dataset.control)+'/control',{action:b.dataset.action});await loadRuns();}finally{b.disabled=false;}});
-async function loadTools(){if(toolsReady)return;if(toolLoad)return toolLoad;$('tools-content').innerHTML=skeleton();toolLoad=(async()=>{try{const [response,module]=await Promise.all([fetch('/assets/production-tools.html?v=20261009-lan2'),import('/assets/production-tools.js?v=20261009-lan2')]);if(!response.ok)throw Error('工具页面读取失败');$('tools-content').innerHTML=await response.text();await module.setupTools({refresh:async()=>{await loadRuns();libraryLoaded=false;}});toolsReady=true;}
+async function loadTools(){if(toolsReady)return;if(toolLoad)return toolLoad;$('tools-content').innerHTML=skeleton();toolLoad=(async()=>{try{const [response,module]=await Promise.all([fetch('/assets/production-tools.html?v=20261009-lan3'),import('/assets/production-tools.js?v=20261009-lan3')]);if(!response.ok)throw Error('工具页面读取失败');$('tools-content').innerHTML=await response.text();await module.setupTools({refresh:async()=>{await loadRuns();libraryLoaded=false;}});toolsReady=true;}
   catch(e){$('tools-content').innerHTML=`<div class="state-empty"><h3>工具暂时未能载入</h3><p>${esc(e.message)}</p><button id="tools-retry">重新载入</button></div>`;$('tools-retry').onclick=()=>loadTools();}finally{toolLoad=null;}})();return toolLoad;}
 document.addEventListener('visibilitychange',()=>{clearTimeout(timer);if(!document.hidden&&(pane==='tasks'||guide?.hasTask()))loadRuns({background:true});});
 // 「新建创作」是整页的主入口。它一旦在初始化阶段抛错，页面就永远停在

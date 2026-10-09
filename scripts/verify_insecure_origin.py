@@ -10,6 +10,9 @@
   .venv\\Scripts\\python.exe scripts/verify_insecure_origin.py
   .venv\\Scripts\\python.exe scripts/verify_insecure_origin.py --lan-ip 10.6.101.1
 
+  # 1b) 用机器名打开（复现 http://<机器名>:8000 报"请从本机工作台打开账号连接"的场景）
+  .venv\\Scripts\\python.exe scripts/verify_insecure_origin.py --host-name %COMPUTERNAME%
+
   # 2) 验已经在跑的实例（例如在生产机上）。若该实例只绑 127.0.0.1，
   #    用 --alias-host 让 Chromium 把一个非 localhost 主机名解析到 127.0.0.1：
   .venv\\Scripts\\python.exe scripts/verify_insecure_origin.py --origin http://10.6.101.1:8000
@@ -21,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import re
 import shutil
 import socket
 import subprocess
@@ -116,6 +118,8 @@ def main() -> int:
     parser.add_argument("--origin", help="直接验证这个来源（例如 http://10.6.101.1:8000）")
     parser.add_argument("--alias-host", help="把这个主机名解析到 127.0.0.1（用于只绑回环的实例）")
     parser.add_argument("--api", help="后端 API 基址，用于提交校验；默认与 --origin 同主机")
+    parser.add_argument("--host-name", help="用这个主机名（例如本机机器名）作为访问来源，"
+                                            "复现 http://<机器名>:8000 的场景")
     parser.add_argument("--submit", action="store_true",
                         help="验 --origin 时也做提交校验（会往目标库排一条 local_seed 任务，默认关闭）")
     args = parser.parse_args()
@@ -141,8 +145,12 @@ def main() -> int:
                 print("未能探测到内网 IPv4，请用 --lan-ip 指定。")
                 return 2
             origin, _loopback, procs, logs, tmp = accept_isolated_service(lan_ip)
+            if args.host_name:
+                # 用户实测报 403 的正是这种地址：Host 是机器名而不是 IP 字面量。
+                # 机器名照常解析（本机名 -> 内网 IP），Host 头保持机器名不变。
+                origin = f"http://{args.host_name}:{origin.rsplit(':', 1)[1]}"
             # 接口探测与提交校验也走非本机来源，顺带覆盖访问边界
-            # （走回环地址只能证明服务可用，证明不了"局域网能不能用"）。
+            # （走回环地址只能证明服务可用，证明不了"局域网/机器名能不能用"）。
             api_base = origin
             print(f"隔离服务已起：{origin}")
         print(f"--- 访问来源：{origin}")
@@ -185,14 +193,20 @@ def main() -> int:
             # 访问边界依赖，一旦"局域网被拦"回潮，这里会立刻指出来，而不是靠页面上的
             # 一句含糊提示。
             probe_host = api_base.split("//", 1)[-1].split(":", 1)[0]
-            if not re.match(r"^\d+\.\d+\.\d+\.\d+$", probe_host):
-                print(f"跳过接口探测（{probe_host} 在 Python 侧不一定能解析，可用 --api 指定可直连地址）")
+            try:
+                socket.getaddrinfo(probe_host, None)
+                resolvable = True
+            except OSError:
+                resolvable = False
+            if not resolvable:
+                print(f"跳过接口探测（{probe_host} 在本机解析不了，可用 --api 指定可直连地址）")
             else:
                 if probe_host in {"127.0.0.1", "localhost"}:
                     print("注意：接口探测走的是回环地址，只证明服务可用，不覆盖访问边界")
                 for path in ["/studio/options", "/accounts/douyin", "/content-skills", "/video-presenters"]:
                     response = client.get(api_base + "/api/v1" + path)
-                    check(f"非本机来源可访问 {path}（HTTP {response.status_code}）",
+                    check(f"非本机来源可访问 {path}（HTTP {response.status_code}）"
+                          + (f" → {response.text[:160]}" if response.status_code != 200 else ""),
                           response.status_code == 200)
 
             # 草稿 key 由 uuid() 生成；后端把 request_id 声明为 UUID，必须是合法 UUID v4。
