@@ -22,7 +22,7 @@ def check(name, ok):
  passed+=1
  print('PASS '+name, flush=True)
 def send(body):return client.post('/api/v1/studio/produce', headers=headers, json=body)
-body={'request_id':str(uuid4()), 'topic':'如何做一个读书笔记', 'run_mode':'local_seed', 'pages':1}
+body={'request_id':str(uuid4()), 'topic':'如何做一个读书笔记', 'run_mode':'local_seed'}
 first=send(body)
 check('initial submission queues', first.status_code==202)
 second=send(body)
@@ -56,7 +56,7 @@ check('omitted defaults and explicit defaults are identical',same_fields.json()[
 direct={'creation_key':str(uuid4()),'topic':'直接接口测试','run_mode':'local_seed'}
 old=client.post('/api/v1/creation/produce',json=direct)
 check('direct creation retains overwrite protection',client.post('/api/v1/creation/produce',json={**direct,'topic':'另一个直接选题'}).status_code==409)
-legacy={'request_id':str(uuid4()),'topic':'旧版本草稿恢复','run_mode':'local_seed','pages':1}
+legacy={'request_id':str(uuid4()),'topic':'旧版本草稿恢复','run_mode':'local_seed'}
 p=studio.StudioInput(**legacy)
 from app.services.content_forms import build_brief
 from app.services.content_recipes import apply_recipe

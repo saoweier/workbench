@@ -74,6 +74,27 @@ class RebuildInput(BaseModel):
     creative_brief: CreativeBrief | None = None
 
 
+def _inherited_materials(base) -> list[dict]:
+    """改稿时沿用上一版里**用户自己提供**的资料。
+
+    改稿最常见的用法就是只写一句修改要求，不重新粘贴资料。资料基础不该因为
+    「这次没再贴一遍」而丢掉——丢了研究阶段就得回退到自动检索，而检索召回
+    并不总是能把原题找回来，改稿就会整条失败（用户看到的是「改不了稿」）。
+    只用原稿里 `kind=user_provided` 的正文，检索摘要不入库、也不在这里复用。
+    """
+    out: list[dict] = []
+    total = 0
+    for src in (base.claims_json or {}).get("sources", []):
+        if src.get("kind") != "user_provided":
+            continue
+        text = (src.get("excerpt") or "").strip()
+        if not text or total + len(text) > 16000:
+            continue
+        out.append({"text": text, "kind": "user_provided"})
+        total += len(text)
+    return out
+
+
 @router.post('/contents/{content_id}/rebuild', status_code=202)
 def rebuild(content_id: str, payload: RebuildInput):
     """Research and rewrite a new revision; retain prior reviews and artifacts."""
@@ -100,7 +121,9 @@ def rebuild(content_id: str, payload: RebuildInput):
                 raise ValidationFailed('请先配置可用的文字模型')
         run=Run(content_id=content_id,stage='produce',state='queued',mode=payload.run_mode.value,attempt=0)
         s.add(run);s.flush()
-        materials=[{'text':payload.materials,'kind':'user_provided'}] if payload.materials.strip() else []
+        base = s.get(ContentRevision, payload.base_revision_id)
+        materials=([{'text':payload.materials,'kind':'user_provided'}] if payload.materials.strip()
+                   else (_inherited_materials(base) if base else []))
         request={'content_id':content_id,'topic':item.topic,'topic_locked':True,
             'run_mode':payload.run_mode.value,'platforms':['douyin','xiaohongshu'],'render':True,
             'user_materials':materials,'user_requirements':payload.requirements}

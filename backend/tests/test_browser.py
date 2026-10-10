@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
 from playwright.sync_api import sync_playwright, expect
 from app.services.renderer import PlaywrightRenderer
+from app.services.compose_service import PAGE_STRATEGY
 from mock_provider import start_mock
 
 passed=0
@@ -35,7 +36,12 @@ def page_errors(errors):
 
 tmp = Path(tempfile.mkdtemp(prefix="cwb-browser-"))
 for name in ["artifacts", "tmp"]:
-    shutil.copytree(ROOT / "examples/demo/storage" / name, tmp / name)
+    # `examples/demo/storage/tmp` 是空目录，被 .gitignore 的 `storage/` 规则挡住，
+    # 从来没有进过版本库；全新克隆里它不存在。缺了就建，不让环境差异变成红灯。
+    (tmp / name).mkdir(parents=True, exist_ok=True)
+    source = ROOT / "examples/demo/storage" / name
+    if source.is_dir():
+        shutil.copytree(source, tmp / name, dirs_exist_ok=True)
 shutil.copy2(ROOT / "examples/demo/storage/workbench.db", tmp / "cwb.db")
 shutil.copy2(ROOT / "examples/demo/storage/profiles.json", tmp / "profiles.json")
 with socket.socket() as probe:
@@ -206,12 +212,19 @@ try:
             page.wait_for_timeout(500)
         # 注意"没到终态"和"失败"是两回事：state 还是 queued/running 说明 60s 预算不够
         # （机器同时在跑别的服务时会这样），而 failed 一定带 error。把两者都写进断言名里。
-        check("两页直接创作经完整后台完成：state=%s error=%s" % (guide_run['state'], guide_run.get('error')),
+        check("直接创作经完整后台完成：state=%s error=%s" % (guide_run['state'], guide_run.get('error')),
               guide_run['state']=='succeeded')
         detail=get('/contents/'+guide_task['content_id'])
         check("用户原题未被换成推荐角度",detail['topic']==picked)
         rev=next(r for r in detail['revisions'] if r['revision_id']==detail['active_revision_id'])
-        check("每个平台都遵守两页要求",all(len(p['pages'])==2 for p in rev['platforms']))
+        # 创作阶段不再由界面指定页码：篇幅按平台默认策略自动决定（抖音 4–6、小红书 5–7），
+        # 首屏仍是封面。这里按策略区间校验，避免把默认字数写死成"两页"。
+        check("篇幅按平台默认策略自动决定，不依赖界面指定页码",
+              all(PAGE_STRATEGY[p['platform']]['min_pages']<=len(p['pages'])<=PAGE_STRATEGY[p['platform']]['max_pages']
+                  for p in rev['platforms'])
+              and all(PAGE_STRATEGY[p['platform']]['min_pages']<=p['page_count']<=PAGE_STRATEGY[p['platform']]['max_pages']
+                      for p in rev['platforms'])
+              and all(p['pages'][0]['layout']=='cover' for p in rev['platforms']))
         master_calls=[r for r in requests if '用户确认的创作要求' in r['messages'][-1]['content']]
         check("真实协议请求保留用户补充要求",len(master_calls)>=3 and all('不要提付费工具' in r['messages'][-1]['content'] and '语言轻松一点' in r['messages'][-1]['content'] for r in master_calls))
         expect(page.locator('#creator-preview')).to_be_visible(timeout=15000)

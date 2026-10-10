@@ -144,10 +144,21 @@ class FixtureAdapter(BaseAdapter):
         schema = self._resolve(schema, root)
         props = schema.get("properties", {})
         if 'acceptance_checks' in props and 'objective' in props:
+            # 页数：默认 4 页（够用就好）。但用户把下限抬到 4 页以上时必须跟着走，
+            # 否则「增加页数」在离线链路上永远过不了规划校验（要求 7～9 页、只规划出 4 页）。
+            page_spec = props.get('pages') or {}
+            low = int(page_spec.get('minItems') or 0)
+            high = int(page_spec.get('maxItems') or 0) or None
+            count = max(low, 4)
+            if high:
+                count = min(count, high)
+            count = max(count, 1)
+            headings = ['问题与结论', '对象与选择', '具体做法', '边界与行动']
+            headings += [f'第{n}页要点' for n in range(5, count + 1)]
             return {'audience':'离线协议演练读者','objective':'协议演练：回答明确问题',
                 'required_elements':['具体对象','操作建议'],'acceptance_checks':['图解与主题一致','保留来源边界'],
                 'pages':[{'index':i+1,'purpose':'说明具体建议与来源边界','heading':h,'points':['仅为离线协议演练'],
-                    'visual_type':'diagram','visual_brief':'本地关系图解','claim_ids':[]} for i,h in enumerate(['问题与结论','对象与选择','具体做法','边界与行动'][:props['pages'].get('maxItems',4)])],
+                    'visual_type':'diagram','visual_brief':'本地关系图解','claim_ids':[]} for i,h in enumerate(headings[:count])],
                 'material_gaps':[],'limitations':['离线协议模拟，非真实模型质量评估']}
         if 'requirements_coverage' in props:
             return {'passed':True,'summary':'离线协议模拟审核，不代表真实语义审核质量。',

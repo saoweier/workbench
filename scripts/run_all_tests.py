@@ -10,7 +10,7 @@ import os
 ROOT = Path(__file__).resolve().parent.parent
 STAGES = ("p0_smoke", "p1_e2e", "p2_e2e", "p3_e2e", "p4_e2e", "p5_e2e", "operations", "delivery", "browser", "autonomous_selection", "visual_content", "production_refresh", "direct_creator", "platform_accounts", "douyin_publishing", "studio_updates", "fruit_quality", "motion_studio", "content_skills", "content_recipes", "evidence_grounding", "meme_images", "token_cost")
 SUMMARY = re.compile(r"(?:结果：)?(?P<passed>\d+) 通过 / (?P<failed>\d+) 失败")
-STAGES=(*STAGES,'template_packages','planning_repair','style_families','completed_output_repair','guidance','planning_policy','research_agent','searxng','hotpush_research','studio_submission','query_startup','acceptance','deliverables','content_evals')
+STAGES=(*STAGES,'template_packages','planning_repair','style_families','completed_output_repair','guidance','planning_policy','research_agent','searxng','hotpush_research','studio_submission','query_startup','acceptance','deliverables','content_evals','creation_flow')
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 

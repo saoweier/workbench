@@ -51,7 +51,8 @@ check('original completed response is not regenerated or silently repaginated',l
 schema=rt.calls[0]['json_schema']
 check('schema has no hidden point cap','maxItems' not in schema['$defs']['PlanPage']['properties']['points'])
 check('schema has no hidden page cap','maxItems' not in schema['properties']['pages'] and 'maximum' not in schema['$defs']['PlanPage']['properties']['index'])
-check('creator API has no hidden eight-page cap','maximum' not in StudioInput.model_json_schema()['properties']['pages']['anyOf'][0])
+# 创作入口已经不再接受页码：篇幅由题型与信息密度决定，用户仍可在选题/要求里自己写页数。
+check('creator API no longer takes a page count at creation time','pages' not in StudioInput.model_json_schema()['properties'])
 check('user nine-page brief is not rejected before reaching Skill',build_brief(topic='教程恰好9页').page_max==9)
 check('claim references remain constrained to actual available IDs',schema['$defs']['PlanPage']['properties']['claim_ids']['items']['enum']==['C01'])
 many=deepcopy(original);many['pages']=[]

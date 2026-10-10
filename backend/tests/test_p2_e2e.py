@@ -391,6 +391,26 @@ coverless = c_svc._validate_variant(
     known=KNOWN, profile=pf_dy, platform="douyin")
 check("抖音可以没有封面页（第一页直接给内容）", coverless.pages[0]["layout"] == "checklist")
 
+# 平台要求封面而模型没给时，由程序补一页，而不是把整份稿判死。
+from app.services.platform_policy import insert_cover
+
+plain = [{**base_v["pages"][0], "layout": "checklist"},
+         {"index": 2, "layout": "checklist", "heading": "h2", "body": ["a"], "claim_ids": ["C01"]}]
+filled = insert_cover("xiaohongshu", plain)
+check("小红书缺封面时自动补一页封面而不是中止",
+      [p["layout"] for p in filled] == ["cover", "checklist", "checklist"]
+      and [p["index"] for p in filled] == [1, 2, 3])
+check("已经合规的平台稿不会被补页改动", insert_cover("xiaohongshu", base_v["pages"]) is base_v["pages"])
+check("抖音默认不补封面，只有用户明确要求时才补",
+      insert_cover("douyin", plain) is plain
+      and insert_cover("douyin", plain, force=True)[0]["layout"] == "cover")
+already = [{**base_v["pages"][0], "layout": "checklist",
+            "visual": {"kind": "cover", "title": "t", "items": [], "takeaway": "x"}}]
+check("首页本来就是封面图解时只改版式、不复制出重复页",
+      [p["layout"] for p in insert_cover("xiaohongshu", already)] == ["cover"])
+check("用户把页数锁死时补封面不加页",
+      [p["layout"] for p in insert_cover("xiaohongshu", plain, max_pages=2)] == ["cover", "checklist"])
+
 for label, d, expect in [
     ("悬空 claim", {**base_v, "pages": [{**base_v["pages"][0], "claim_ids": ["ZZ"]}]}, "ZZ"),
     ("亲测措辞",

@@ -53,7 +53,7 @@ export function setupGuidance(){
   try{
    if(s.kind==='model'){const o=await api.get('/studio/options');done=Boolean(o.text_ready);status=done?'文字模型已就绪。':'等待保存并启用文字模型配置。';}
    else if(s.kind==='topic'){done=typeof d.topic==='string'&&d.topic.trim().length>=3&&(d.step>=1||Boolean(d.task));status=done?'选题已保存，可以设置样式。':'选定题目后，点击「下一步 · 选择样式」。';}
-   else if(s.kind==='style'){done=Boolean(d.topic)&&(d.step>=2||Boolean(d.task));status=done?'样式与页数已保存，可以确认制作。':!d.topic?'请先完成选题，再进入「选择样式」。':'核对样式后，进入「确认制作」。';}
+   else if(s.kind==='style'){done=Boolean(d.topic)&&(d.step>=2||Boolean(d.task));status=done?'样式与篇幅已保存，可以确认制作。':!d.topic?'请先完成选题，再进入「选择样式」。':'核对样式后，进入「确认制作」。';}
    else if(s.kind==='produce'){if(d.task?.run_id){const run=await api.get('/runs/'+encodeURIComponent(d.task.run_id));done=['queued','running','succeeded'].includes(run.state);status=done?'任务已提交；完成后再核对实际图片。':'任务停在'+(run.blocked_stage||'制作阶段')+'：'+(run.error||'请查看任务提示。');}else status=!d.topic?'请先完成选题与样式，再确认制作。':'等待你提交制作任务。';}
    else if(s.kind==='preview'||s.kind==='approve'){
     const id=contentId();if(id){const detail=await api.get('/contents/'+encodeURIComponent(id)),rev=detail.revisions?.find(r=>r.revision_id===detail.active_revision_id);

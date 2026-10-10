@@ -100,11 +100,11 @@ stale=next(s for s in stream_result['sources'] if s['platform']=='weibo')
 check('failed source keeps old snapshot with original time',stale['state']=='stale' and stale['fetched_at']==old_board['fetched_at'] and stale['items']==old_board['items'])
 check('SSE completion is finite and records progress',not stream_result['refreshing'] and stream_result['progress']['success']==2)
 
-body={'request_id':str(uuid4()),'topic':topic,'requirements':'不要改成使用教程','density':'short','style':'lively','pages':6,'run_mode':'local_seed'}
+body={'request_id':str(uuid4()),'topic':topic,'requirements':'不要改成使用教程','density':'short','style':'lively','run_mode':'local_seed'}
 q=client.post('/api/v1/studio/produce',headers=headers,json=body)
 check('manual topic queues without recommendation',q.status_code==202)
 queued=q.json();cid=queued['content_id']
-check('topic text pages override conflicting dropdown',queued['creative_brief']['page_max']==2)
+check('topic page range becomes the budget while the UI no longer sets pages',queued['creative_brief']['page_max']==2)
 check('topic unchanged and TOP10 retained',queued['creative_brief']['rank_count']==10)
 check('same request reuses single task',client.post('/api/v1/studio/produce',headers=headers,json=body).json()['reused'])
 edited=client.post('/api/v1/studio/produce',headers=headers,json={**body,'topic':'换个主题'})

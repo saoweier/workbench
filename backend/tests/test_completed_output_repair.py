@@ -126,6 +126,41 @@ with patch('app.api.studio.production.rebuild',side_effect=lambda cid,payload:ca
 check('revision stores latest request instead of stale prose',captured[0].creative_brief.original_requirements==instruction)
 check('revision keeps existing hard pages while updating detail cap',captured[0].creative_brief.page_max==2 and captured[0].creative_brief.detail_max==30)
 check('revision explicitly resolves contradictory historical requests','修改优先级：' in captured[0].requirements)
+
+# 「增加页数 / 增加封面」这类**不带数字**的改稿要求过去被解析器整个忽略：
+# parse_page_budget 解析不到就沿用旧预算，于是用户反复改稿、页数一直不变
+# （C031 就卡在首轮选的 1 页，小红书那一页还被封面吃掉，没有正文）。
+from app.services.content_forms import adjust_page_budget,strip_page_budget_notes
+grow='增加页数  增加封面'
+with patch('app.api.studio.production.rebuild',side_effect=lambda cid,payload:captured.append(payload) or {'state':'queued'}):
+ studio.revise(cid,studio.StudioRevision(request_id=uuid4(),base_revision_id=rid,instruction=grow))
+grown=captured[-1].creative_brief
+check('qualitative increase-pages request really grows the budget',
+      grown.explicit_pages and grown.page_max>2 and grown.page_min>=2)
+check('qualitative cover request is recorded for every platform',grown.want_cover is True)
+check('rebuilt requirement states the current page budget','全稿2～4页，封面计入页数。' in captured[-1].requirements)
+check('stale page sentences are dropped before the new instruction',
+      strip_page_budget_notes('\n全稿恰好1页，封面计入页数。\n保留原文要点\n')=='保留原文要点')
+check('a shrinking request never goes below cover+content',
+      adjust_page_budget('explainer',6,6,'down')==(2,4) and adjust_page_budget('explainer',1,1,'down') is None)
+check('a plain rewrite keeps the page budget untouched',
+      build_brief(topic='赛制说明',requirements='更短更精简').explicit_pages is False)
+
+# 小红书缺封面时由 compose 补页后照样通过校验，不再两轮修复后整份中止。
+coverless=deepcopy(good)
+coverless['pages'][0]['layout']='checklist'
+coverless['pages'][0]['visual']['kind']='map'
+def _compose_coverless(brief):
+    rt=Runtime([coverless]);service=ComposeService(SessionFactory,rt)
+    service._generate_variant=lambda *a,**kw:deepcopy(coverless)
+    return (rt,*service.compose_platform(master,'xiaohongshu',engineering_default('xiaohongshu'),
+        run_mode=RunMode.REAL,creative_brief=brief))
+rt,draft,_=_compose_coverless(build_brief(topic='赛制说明'))
+check('missing xiaohongshu cover is added when the page budget allows',
+      [p['layout'] for p in draft.pages]==['cover','checklist'] and not rt.calls)
+rt,draft,_=_compose_coverless(build_brief(topic='赛制说明',requirements='做一个赛制指南，恰好1页'))
+check('a locked one-page budget converts the first page into the cover rather than adding one',
+      [p['layout'] for p in draft.pages]==['cover'] and not rt.calls)
 from app.services.renderer import check_layout
 from app.services.template_packages import builtins
 for kind in ['flow','map']:

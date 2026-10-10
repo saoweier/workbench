@@ -113,7 +113,7 @@ try:
  saved=client.post('/api/v1/provider-configs',headers=headers,json={'name':'recipe-protocol-stub','kind':'text','adapter_type':'openai_compatible','base_url':f'http://127.0.0.1:{server.server_port}','model_id':'stub','api_key':'stub','enabled':True,'allow_localhost':True})
  check('model stub configured',saved.status_code==201)
  material='示例数据，仅测试排版，非真实安装量。\n'+'\n'.join(f'示例Skill{i:02d} {100+i}次；示例累计安装，2026-10-01。' for i in range(1,16))
- body={'request_id':str(uuid4()),'topic':'15个Skill分类速查表，1页','direction':'tech','template_id':'category_table','density':'short','materials':material,'run_mode':'real','pages':1}
+ body={'request_id':str(uuid4()),'topic':'15个Skill分类速查表，1页','direction':'tech','template_id':'category_table','density':'short','materials':material,'run_mode':'real'}
  task=client.post('/api/v1/studio/produce',headers=headers,json=body).json();Worker(creation.SessionFactory,get_settings(),worker_id='recipe-test').tick()
  run=client.get('/api/v1/runs/'+task['run_id']).json()
  check('directory pipeline completes actual PNG render and audit: '+str(run.get('error')),run['state']=='succeeded')

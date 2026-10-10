@@ -41,7 +41,7 @@ from .provider_runtime import ProviderRuntime
 from .renderer import check_layout
 from .visual_content import VISUAL_SCHEMA, ILLUSTRATED_TEMPLATE_VERSION, add_rule_visuals
 from .fruit_content import is_fruit_topic, guidance as fruit_guidance, validate_subject, required_fruits
-from .platform_policy import cover_instruction, cover_problem, copy_angle_instruction, requires_cover
+from .platform_policy import cover_instruction, cover_problem, copy_angle_instruction, insert_cover, needs_cover, requires_cover
 
 #: 模型**永远**不能写的字段。命中即权限越界，直接拒收、不进修复。
 #: 这些都对应"只有人工会话或本地程序能改"的状态。
@@ -159,6 +159,34 @@ def _is_ranking(brief):
     return (_brief_get(brief, "form", "") or "") == "ranking"
 
 
+def _want_cover(brief) -> bool:
+    """用户是否明确要求「每个平台都出封面页」。"""
+    return bool(_brief_get(brief, "want_cover", False))
+
+
+def _with_platform_cover(raw, platform: str, brief):
+    """平台要求封面而模型没给时，由程序补一页封面再送去校验。
+
+    小红书必须有封面一是平台约定（`platform_policy`），二是用户可能显式要过封面。
+    过去这份依赖只落在提示词和校验上：模型漏了就报错、重试两轮后整份稿中止。
+    这里改成先补页再校验——封面是版式约定的一部分，程序能确定性地满足它。
+
+    用户显式锁死页数时不能加页（`_validate_variant` 会按预算拒稿），
+    这时把第一页就地改成封面页：尊重预算优先于「封面之外还要有正文」。
+    """
+    if not isinstance(raw, dict):
+        return raw
+    pages = raw.get("pages")
+    if not isinstance(pages, list) or not pages or not all(isinstance(p, dict) for p in pages):
+        return raw
+    budget = _budget_of(brief)
+    fixed = insert_cover(platform, pages, force=_want_cover(brief),
+                         max_pages=budget[1] if budget else None)
+    if fixed is pages:
+        return raw
+    return {**raw, "pages": fixed}
+
+
 def _master_page_range(brief):
     """母稿允许的页数区间 (min, max|None)。
 
@@ -208,6 +236,7 @@ def _form_prompt_block(brief, strategy, platform=None):
         return ""
     form = _brief_get(brief, "form", "") or "explainer"
     rank = _brief_get(brief, "rank_count")
+    force_cover = _want_cover(brief)
     lo, hi = strategy["min_pages"], strategy["max_pages"]
     parts = [f"\n本题材形态：{_brief_get(brief, 'form_name') or form}。"
              f"全稿共 {lo}–{hi} 页，不得超过 {hi} 页，不要为凑页数补充无关内容。"]
@@ -225,8 +254,11 @@ def _form_prompt_block(brief, strategy, platform=None):
             head
             + 'label 写对象全名（最多80字，不重复写编号），'
             'detail 写入选理由与实际热度指标（最多64字）。'
-            '只有1页时该页就是完整排行榜，不另做封面；2页可做封面+完整榜单，或两页分列名次。'
-            + (f'本平台封面约定：{cover_instruction(platform)}' if platform else '')
+            + ('用户明确要求每个平台都有封面页：封面之外仍要列出完整榜单，'
+               '不要为了腾出封面而删减名次。'
+               if (platform and force_cover) else
+               '只有1页时该页就是完整排行榜，不另做封面；2页可做封面+完整榜单，或两页分列名次。')
+            + (f'本平台封面约定：{cover_instruction(platform, force_cover)}' if platform else '')
             + '仅使用 cover 或 rank。排序口径和时间范围必须与原选题一致。'
             '资料缺少真实对象、指标或该时间段数据时说明缺口，禁止虚构热度或自行改做对照。'
         )
@@ -682,13 +714,15 @@ class ComposeService:
                 if gen_error is not None:
                     raise gen_error
                 try:
-                    draft = self._validate_variant(raw, known=known, profile=profile,
+                    draft = self._validate_variant(_with_platform_cover(raw, platform, brief),
+                        known=known, profile=profile,
                         platform=platform, kinds=kinds, brief=brief)
                 except ValidationFailed as exc:
                     if not (exc.details.get('caption_budget') and run_mode==RunMode.REAL and self.runtime):raise
                     # Fix only the oversized field; preserve all already-generated page content.
                     raw={**raw,'caption':self._compact_caption(raw,brief,platform,content_id,run_mode,round_no)}
-                    draft=self._validate_variant(raw,known=known,profile=profile,
+                    draft=self._validate_variant(_with_platform_cover(raw, platform, brief),
+                        known=known,profile=profile,
                         platform=platform,kinds=kinds,brief=brief)
                 used={i.get('media_id') for p in draft.pages for i in (p.get('visual') or {}).get('items',[]) if i.get('media_id')}
                 allowed={m['id'] for m in self.media_assets}
@@ -848,7 +882,7 @@ class ComposeService:
         except ValueError as exc:raise ValidationFailed('榜单文字不符合约定结构：'+str(exc)) from exc
         from .catalog_compiler import compile_rows
         pages=compile_rows(words,strategy=strategy,brief=_brief_json(brief),claim_ids=master.claim_ids,sources=getattr(self,'_active_sources',[]),ranking=ranking,verify_objects=True,
-            cover=requires_cover(platform))
+            cover=needs_cover(platform,_want_cover(brief)))
         return {'platform':platform,'title':words['title'],'caption':words['caption'],'pages':pages}
 
     def _generate_meme_text(self,master,platform,brief,content_id,run_mode,requirements,feedback,round_no):
@@ -914,7 +948,7 @@ class ComposeService:
                 f"每页正文最多 {lim.max_body_lines_per_page} 行，"
                 f"封面标题最多 {min(lim.max_heading_chars, width // 40)} 字，"
                 f"内页标题最多 {min(lim.max_heading_chars, width // 34)} 字。"
-                + cover_instruction(platform) +
+                + cover_instruction(platform, _want_cover(brief)) +
                 "body 是短句数组，请按自然语义分行，长句放到发布正文，不要截断句子。"
             )
         prompt += (
@@ -1040,13 +1074,13 @@ class ComposeService:
                 rows.append({'label':label,'detail':detail if sep else '本地版式演练，需补充具体功能资料','category':'资料整理','icon':'page','tags':[]})
             words={'title':self._fit_heading(master.core_viewpoint,20),'caption':'本地版式演练，未进行实时调研；请人工核对对象和功能。','order_note':'依资料原顺序，不代表热度','source_note':'本地演练，仅基于给定资料','takeaway':'按需要核对具体功能，不把演练当作真实效果','items':rows}
             pages=compile_rows(words,strategy=strategy,brief=_brief_json(brief),claim_ids=master.claim_ids,sources=[],ranking=False,
-                cover=requires_cover(platform))
+                cover=needs_cover(platform,_want_cover(brief)))
             return {'platform':platform,'title':words['title'],'caption':words['caption'],'pages':pages}
         if _is_ranking(brief):
             return self._ranking_by_rules(master, platform, strategy, lim, brief)
         body_lines = strategy["body_lines"]
         is_dy = platform == "douyin"
-        has_cover = requires_cover(platform)
+        has_cover = needs_cover(platform, _want_cover(brief))
         max_title = lim.max_title_chars if lim else 20
         max_heading = lim.max_heading_chars if lim else 24
         max_line = lim.max_body_chars_per_page if lim else 120
@@ -1117,7 +1151,7 @@ class ComposeService:
         封面按平台区分：小红书单独出封面页，抖音不要求封面，把版面全部留给名次。
         """
         is_dy = platform == "douyin"
-        has_cover = requires_cover(platform)
+        has_cover = needs_cover(platform, _want_cover(brief))
         max_title = lim.max_title_chars if lim else 20
         max_heading = lim.max_heading_chars if lim else 24
         budget = _budget_of(brief)

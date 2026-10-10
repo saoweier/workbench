@@ -202,6 +202,8 @@ class CreativeBrief(BaseModel):
     page_min: int | None = None
     page_max: int | None = None
     explicit_pages: bool = False
+    #: 用户明确要求每个平台都出封面页；False 表示按平台默认（小红书必有、抖音可无）
+    want_cover: bool = False
     #: 榜单条目数（TOP10 → 10）
     rank_count: int | None = None
     #: 解析依据，便于在界面与日志里向用户解释
@@ -266,6 +268,171 @@ def parse_page_budget(text: str) -> tuple[int, int] | None:
         if n:
             return (n, n)
     return None
+
+
+# ------------------------------------------------------- 页数诉求 / 封面诉求
+#
+# 用户在预览阶段常常只写「增加页数」「少几页」，不给数字。过去这类指令完全落空：
+# `parse_page_budget` 只认「N 页」，解析不到就原样沿用旧预算，于是用户反复改稿、
+# 页数却一直停在 1 页（C031 即为此类）。下面把「定性诉求 → 具体页数」补上。
+#
+# 措辞必须写死在常量里而不是靠模糊匹配：改稿文本里「保留页数」「保留全部名次与
+# 页数」这类要求极常见，宽泛匹配会把「保持」误判成「增加」。
+
+#: 「增加/减少页数」每次调整的步长（页）
+PAGE_STEP = 2
+#: 任何稿件的最小页数。要求封面的平台会把首页做封面，低于 2 页就没有正文页。
+MIN_PAGES = 2
+
+_PAGE_UP = re.compile(
+    r"(?:增加|加多|多加|增多|扩充|扩展|加长|再加|再多|多分|加到|分成|拆成|拆开|展开)"
+    r"\s*(?:成|为|到)?\s*(?:几|两|三|四|多)?\s*(?:页|篇幅)"
+    r"|页数\s*(?:多|增加|加多|不够|太少|偏少)"
+    r"|篇幅\s*(?:多|增加|加长|扩)"
+)
+_PAGE_DOWN = re.compile(
+    r"(?:减少|缩减|压缩|精简|缩短|删减|去掉)"
+    r"\s*(?:成|为|到)?\s*(?:几|两|三|四|多)?\s*(?:页|篇幅)"
+    r"|少\s*几\s*页"
+    r"|页数\s*(?:少|减少|太多|过多|偏多)"
+)
+#: 旧稿里由本程序写入的页数句子。改稿时要先删掉再写新的，
+#: 否则「全稿恰好1页」会和「增加页数」同时进入提示词，模型只能听信前者。
+_PAGE_NOTE = re.compile(r"全稿[^。\n]{0,24}?页[^。\n]*。?")
+
+_COVER_WANT = re.compile(
+    r"(?<![不别没无需])(?:增加|加多|加上|加个|加一个|配上|补上|带上|做成|生成|自动|要|需要)"
+    r"\s*(?:一个|一张|独立|单独的)?\s*(?:封面|首图)"
+)
+_COVER_REJECT = re.compile(
+    r"(?:不需要|无需|不用|不加|不要|去掉|删除|取消|没有|别加)"
+    r"\s*(?:一个|一张|独立|单独的)?\s*(?:封面|首图)"
+)
+
+
+def parse_page_direction(text: str) -> str | None:
+    """识别**没有数字**的页数诉求：返回 'up' / 'down'，没提到页数返回 None。
+
+    有数字时先走 `parse_page_budget`（用户给了具体页数就以具体页数为准），
+    这里只负责「增加页数 / 少几页」这类定性措辞。两种措辞同时出现时，
+    以最后出现的那一个为准——用户改主意时通常写在后面。
+    """
+    t = text or ""
+    up, down = _PAGE_UP.search(t), _PAGE_DOWN.search(t)
+    if up and down:
+        return "up" if up.start() > down.start() else "down"
+    if up:
+        return "up"
+    if down:
+        return "down"
+    return None
+
+
+def adjust_page_budget(
+    form_id: str | None, page_min, page_max, direction: str
+) -> tuple[int, int] | None:
+    """把定性页数诉求换算成具体页数区间；无可调整时返回 None（保持原样）。
+
+    - 增加：以当前上限为基准再加一个步长，**并把下限抬到原上限**。用户说
+      「增加页数」是想多看到几页，只放宽上限的话模型仍会按下限出稿，
+      改完稿页数一页没变（这是改稿环节最容易被忽略的一处空转）。
+    - 减少：不低于 `MIN_PAGES`；本来就没有页数约束、或已经不能再少时不做改动。
+    """
+    spec = FORMS.get(form_id or "") or FORMS["explainer"]
+    cur_min = max(1, int(page_min or 0))
+    cur_max = max(cur_min, int(page_max or 0)) if cur_min else 0
+    if direction == "up":
+        # 没有页数预算时以题型默认下限为基准，避免一次「增加」就冲到十几页。
+        base = cur_max or spec.page_min
+        high = max(base + PAGE_STEP, spec.page_min)
+        low = max(MIN_PAGES, base)
+        return (low, max(low, high))
+    if not cur_max or cur_max <= MIN_PAGES:
+        return None
+    return (MIN_PAGES, max(MIN_PAGES, cur_max - PAGE_STEP))
+
+
+def strip_page_budget_notes(text: str) -> str:
+    """删掉旧稿里过期的页数句子，避免和新要求自相矛盾。"""
+    cleaned = _PAGE_NOTE.sub("", text or "")
+    return "\n".join(line for line in cleaned.splitlines() if line.strip())
+
+
+def page_budget_note(page_min: int, page_max: int) -> str:
+    """写进创作要求的页数句子；措辞与首轮创作保持一致。"""
+    if page_min == page_max:
+        return f"全稿恰好{page_min}页，封面计入页数。"
+    return f"全稿{page_min}～{page_max}页，封面计入页数。"
+
+
+def parse_cover_request(text: str) -> bool | None:
+    """识别用户对封面的明确要求；返回 True（要封面）/ False（不要）/ None（没提到）。
+
+    None 与 False 必须分开：前者是「别拿平台默认去猜用户」，后者是「用户明确说不要」。
+    """
+    t = text or ""
+    reject, want = _COVER_REJECT.search(t), _COVER_WANT.search(t)
+    if reject and (not want or reject.start() > want.start()):
+        return False
+    if want:
+        return True
+    return None
+
+
+# ---------------------------------------------------------------- 内容详细程度
+#
+# 创作阶段由界面选「精简／均衡／详细」，改稿阶段只能靠一句话。过去这句话只是
+# 自由文本进提示词，改完稿篇幅往往没变——用户说「更详细」看不到差别。
+# 这里把它变成可校验的具体约束：发布文案字数上限（`caption_max`，模型 schema
+# 与校验都真的按它拦）+ 一条写给模型的明确指示。
+#
+# 步进换页数、换密度都必须先删掉旧指示：留着「精简」会和「更详细」同时在提示词里，
+# 模型只会挑最具体的那条听——这正是 C031 的成因。
+
+#: 详细程度 → 发布文案字数区间（与创作阶段的界面选项保持一致）
+DENSITY_CAPTION = {"short": (None, 300), "balanced": (None, 500), "detailed": (None, 850)}
+
+_DENSITY_DOWN = re.compile(
+    r"更短|再短|短一点|短一些|精简|简化|简化一下|去掉重复|删除重复|压缩(?!页|篇幅)|"
+    r"少写|写少|减少篇幅|不要(?:那么|太)长|太长了"
+)
+_DENSITY_UP = re.compile(
+    r"更详细|再详细|详细点|详细一些|补充细节|补充说明|展开(?:说明|解释|讲|写)|"
+    r"多写|写得更具体|更具体|深入(?:说明|解释)|充分(?:说明|解释)"
+)
+#: 本程序写入的详细程度句子。改稿时先删旧的再写新的。
+_DENSITY_NOTE = re.compile(r"内容详细程度：[^。\n]*。?")
+
+
+def parse_density_direction(text: str) -> str | None:
+    """识别「更短更精简 / 更详细」这类**没有数字**的详细程度诉求。
+
+    返回 'short' / 'detailed'，没提到返回 None。同时出现时以后出现的那一个为准
+    ——用户改主意通常写在后面。明确写了字数（「文案控制在 200～260 字」）时不走这里，
+    数字优先，见 `studio.revise`。
+    """
+    t = text or ""
+    up, down = _DENSITY_UP.search(t), _DENSITY_DOWN.search(t)
+    if up and down:
+        return "detailed" if up.start() > down.start() else "short"
+    if up:
+        return "detailed"
+    if down:
+        return "short"
+    return None
+
+
+def strip_density_notes(text: str) -> str:
+    """删掉旧稿里过期的详细程度句子，避免和新要求自相矛盾。"""
+    cleaned = _DENSITY_NOTE.sub("", text or "")
+    return "\n".join(line for line in cleaned.splitlines() if line.strip())
+
+
+def density_note(direction: str) -> str:
+    """写进创作要求的详细程度句子。只说篇幅与解释深度，不动页数与对象数量。"""
+    if direction == "short":
+        return "内容详细程度：精简，每页只保留核心结论与必要说明，删除重复解释、铺垫和客套，但不得删减具体对象、名次、数据与事实。"
+    return "内容详细程度：详细，每页补充具体依据、判断理由与可操作细节，不得凑字数、不得编造，页数与对象数量保持不变。"
 
 
 def parse_caption_budget(text: str) -> tuple[int | None, int] | None:
@@ -407,6 +574,7 @@ def build_brief(*, topic: str, requirements: str = "", outline=(), audience: str
         page_min=page_min,
         page_max=page_max,
         explicit_pages=bool(budget),
+        want_cover=parse_cover_request(notes) is True,
         # 只有榜单/清单形态把条目数当作结构约束，其它形态仅作参考
         rank_count=rank_count if form_id in {"ranking", "listicle"} else None,
         detected_from="；".join(detected),

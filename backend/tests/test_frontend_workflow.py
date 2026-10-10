@@ -235,7 +235,6 @@ try:
         page.get_by_role("button", name=re.compile("彩色排行卡片")).click()
         page.get_by_role("radio", name="详细", exact=True).check()
         page.get_by_role("radio", name="活跃生动", exact=True).check()
-        page.get_by_label("内容页数（含封面）").select_option("2")
         page.reload()
         expect(page.get_by_role("heading", name="让内容，有你的风格。")).to_be_visible()
         check("刷新恢复当前步骤和版式", page.get_by_role("button", name=re.compile("彩色排行卡片")).get_attribute("aria-pressed") == "true")
@@ -252,7 +251,8 @@ try:
         page.get_by_role("button", name="确认并开始制作 →").click()
         expect(page.get_by_role("heading", name="正在制作你的内容")).to_be_visible()
         body = Fixture.bodies[0]
-        check("题目、要求、来源和样式完整进入实际请求", body["topic"] == "上个月技能 TOP10，恰好 2 页" and body["requirements"] == "保留全部十个名称" and body["materials"] == "来源：测试资料，共十项" and body["pages"] == 2 and body["template_id"] == "rank_cards" and body["density"] == "detailed" and body["platforms"] == ["douyin"])
+        check("题目、要求、来源和样式完整进入实际请求", body["topic"] == "上个月技能 TOP10，恰好 2 页" and body["requirements"] == "保留全部十个名称" and body["materials"] == "来源：测试资料，共十项" and body["template_id"] == "rank_cards" and body["density"] == "detailed" and body["platforms"] == ["douyin"])
+        check("创作阶段不再由界面指定页码", "pages" not in body)
         page.reload()
         expect(page.get_by_role("heading", name="正在制作你的内容")).to_be_visible()
         check("制作中刷新恢复任务且不重复提交", len(Fixture.bodies) == 1)
