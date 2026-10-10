@@ -57,8 +57,6 @@ def apply_recipe(brief, *, direction='auto', template_id='auto'):
     if allowed and brief.form not in allowed:
         raise ValidationFailed(f"{package['name']}不适合当前{brief.form_name}，请选择自动匹配或图解手册；不会改变你的题型。")
     if brief.form=='directory':brief.rank_count=None
-    if brief.item_count and brief.form=='directory' and brief.item_count>16:
-        raise ValidationFailed('分类速查表当前支持最多16项，请明确缩小数量；不会裁掉条目。')
     brief.direction=detect_direction(brief.original_topic) if direction=='auto' else direction
     brief.direction_name=DIRECTIONS[brief.direction]['name']
     brief.detected_from=brief.detected_from+'；模板 '+package['name']

@@ -6,9 +6,12 @@
    反向代理终止 TLS 时浏览器看到 `https`、应用看到 `http`，那不是跨站。
 2. **拒绝跨站**：`Sec-Fetch-Site: cross-site` 直接拒绝。
 3. **写操作必须带工作台自定义头**：浏览器对跨源自定义头会先发预检，等于再加一道闸。
-4. **Host 必须是 IP 字面量、本机自己的名字、或 `CWB_ALLOWED_HOSTS` 里列出的名字**：这条不是
-   "麻烦"，而是防 **DNS rebinding** —— 恶意站点把自己的域名解析到用户的内网/回环地址，
-   就能借用户浏览器以"同源"姿态调本机 API。此时 Host 是攻击者的**域名**，会被这条挡下。
+4. **Host 校验默认关闭**（2026-10-10 起）：`CWB_ALLOWED_HOSTS` 默认 `*`，任何 Host 都放行，
+   用公网 IP / 自有域名 / 反向代理域名访问都不会再被 403。把 `*` 去掉（设成具体域名或留空）
+   即可恢复严格模式——那时 Host 必须是 IP 字面量、本机自己的名字、或 `CWB_ALLOWED_HOSTS`
+   里列出的名字，用来防 **DNS rebinding**：恶意站点把自己的域名解析到用户的内网/回环地址，
+   借用户浏览器以"同源"姿态调本机 API，此时 Host 是攻击者的**域名**，会被这条挡下。
+   关闭 Host 校验后，剩下的防线是下面的 1-3 条（同源 / 拒绝跨站 / 写操作必须带自定义头）。
 
 关于"本机"（2026-10-09 起放宽）：
 - **非回环客户端**默认放行。服务能收到这种请求，本身就说明运维方已经把它绑到了可被
@@ -16,8 +19,9 @@
   要恢复旧的"只允许本机"，设 `CWB_ALLOW_REMOTE_ACCESS=false`。
 - **本机自己的机器名**（含短名与 `.local`）默认放行，见 `config.local_host_names()`。用
   `http://<机器名>:8000` 打开工作台不该整个 403。
-- 自己的域名 / 反向代理域名要写进 `CWB_ALLOWED_HOSTS`。被拦时 403 文案会直接写出当前
-  Host，照它说的加即可，不用去猜。
+- **Host 校验默认全开**：`CWB_ALLOWED_HOSTS=*`（默认值）时不做 Host 校验，公网 IP、自有域名、
+  反向代理域名都直接放行。想要严格的防 DNS rebinding 行为，把 `CWB_ALLOWED_HOSTS` 设成
+  `127.0.0.1,工作台.example.com` 这类明确名单（留空表示"只认 IP 字面量与机器名"）。
 """
 from ipaddress import ip_address
 from urllib.parse import urlsplit
@@ -70,7 +74,8 @@ def _origin_endpoint(value: str) -> str:
 def local_request(request: Request) -> None:
     settings = get_settings()
     hostname = (request.url.hostname or "").lower()
-    if hostname not in BASE_ALLOWED_HOSTS | settings.trusted_host_names() \
+    if not settings.allows_any_host() \
+            and hostname not in BASE_ALLOWED_HOSTS | settings.trusted_host_names() \
             and not _is_private_host_literal(hostname):
         raise HTTPException(403, _host_rejection(hostname))
     if not _is_loopback_client(request) and not settings.allow_remote_access:

@@ -300,7 +300,9 @@ def plan_pages_from_framework(topic, brief, claims, target):
         head = head.strip() or '内容要点'
         purpose = purpose.strip() or head
         if form.id == 'ranking' and i > 0:
-            brief_text = f"按名次列出每一条，共 {_brief_value(brief, 'rank_count') or ''} 条，每条给出名称与一句入选理由"
+            count = _brief_value(brief, 'rank_count')
+            brief_text = (f"按名次列出每一条，共 {count} 条，每条给出名称与一句入选理由" if count
+                          else "按名次列出每一条，条数按资料能完整列出的真实数量决定，每条给出名称与一句入选理由")
         else:
             brief_text = '本地关系图或示例图'
         pages.append(PlanPage(

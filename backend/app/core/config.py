@@ -60,7 +60,12 @@ class Settings(BaseSettings):
     allow_remote_access: bool = True
     # 用反向代理时把代理域名写进来（逗号分隔）。本机自己的机器名已经默认放行，
     # 这里只需要补代理域名这类额外名字。
-    allowed_hosts: str = ""
+    #
+    # 默认 `*` = 任何 Host 都放行（2026-10-10 起）。工作台是单用户工具，常见用法是绑到
+    # 云主机 / 内网机上、用公网 IP 或自有域名访问，逐个加白名单太容易卡住自己。
+    # 要恢复"只认 IP 字面量 + 本机机器名 + 白名单域名"的严格模式，把 CWB_ALLOWED_HOSTS
+    # 显式设成具体名单（或留空）即可。
+    allowed_hosts: str = "*"
 
     # Optional credentials for approved Douyin Open Platform data scopes.
     # Keep these in the local, ignored .env file; never expose them via API.
@@ -68,7 +73,18 @@ class Settings(BaseSettings):
     douyin_client_secret: str | None = Field(default=None, repr=False)
 
     def extra_allowed_hosts(self) -> set[str]:
-        return {h.strip().lower() for h in self.allowed_hosts.split(",") if h.strip()}
+        return {h.strip().lower() for h in self.allowed_hosts.split(",")
+                if h.strip() and h.strip() != "*"}
+
+    def allows_any_host(self) -> bool:
+        """`CWB_ALLOWED_HOSTS` 含 `*` 时不做 Host 校验（默认即此）。
+
+        代价：防 DNS rebinding 的那道 Host 校验失效——攻击者用自己的域名解析到本机，
+        Host 也会被放行。其余防线照旧：`Origin` 必须与工作台自身同源、`Sec-Fetch-Site:
+        cross-site` 直接拒绝、写操作必须带工作台自定义头（跨源会先触发预检）。
+        要重新启用 Host 校验，把 `*` 从 `CWB_ALLOWED_HOSTS` 里去掉。
+        """
+        return any(h.strip() == "*" for h in self.allowed_hosts.split(","))
 
     def trusted_host_names(self) -> set[str]:
         """可访问的主机名 = CWB_ALLOWED_HOSTS ∪ 本机自己的名字。

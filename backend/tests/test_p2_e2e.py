@@ -349,10 +349,15 @@ except ValidationFailed as exc:
 
 try:
     c_svc._validate_master({"audience_problem": "p", "core_viewpoint": "v", "claim_ids": [],
-                            "pages": _pages(2)}, known=KNOWN, topic="t")
-    check("母稿少于 3 页被拒", False)
+                            "pages": []}, known=KNOWN, topic="t")
+    check("空母稿（0 页）被拒", False)
 except ValidationFailed as exc:
-    check("母稿少于 3 页被拒", "少于 3" in exc.message, exc.message)
+    check("空母稿（0 页）被拒", "没有任何页" in exc.message, exc.message)
+
+# 用户没写页数时不再有「至少 3 页」这类编辑策略下限：2 页母稿合法。
+short = c_svc._validate_master({"audience_problem": "p", "core_viewpoint": "v", "claim_ids": [],
+                                "pages": _pages(2)}, known=KNOWN, topic="t")
+check("未指定页数时 2 页母稿被接受", len(short.pages) == 2, f"pages={len(short.pages)}")
 
 pf_dy = profiles.latest("douyin")
 base_v = {"platform": "douyin", "title": "标题", "caption": "正文",

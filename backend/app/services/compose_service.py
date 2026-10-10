@@ -162,8 +162,9 @@ def _is_ranking(brief):
 def _master_page_range(brief):
     """母稿允许的页数区间 (min, max|None)。
 
-    没有简报时保持旧契约：至少 3 页（test_p2_e2e 明确依赖这条）。
-    有简报时以用户预算为准；榜单没有显式预算时用题型默认区间（2–4 页）。
+    页数只服从**用户显式要求**：写了「1~2 页」就用 1–2 页，没写就不设下限，
+    一页也是合格母稿。题型默认页数只作上限（版式容量），不再当下限强加，
+    避免「用户没要求却因页数不足被拒」。
     """
     budget = _budget_of(brief)
     if budget:
@@ -174,8 +175,8 @@ def _master_page_range(brief):
     if _is_ranking(brief) or _brief_get(brief,'form') in {'directory','meme'}:
         from .content_forms import FORMS
         form = FORMS[_brief_get(brief,"form","ranking")]
-        return (form.page_min, form.page_max)
-    return (3, None)
+        return (1, form.page_max)
+    return (1, None)
 
 
 def _with_pages(schema: dict, lo: int, hi: int | None = None) -> dict:
@@ -211,11 +212,18 @@ def _form_prompt_block(brief, strategy, platform=None):
     parts = [f"\n本题材形态：{_brief_get(brief, 'form_name') or form}。"
              f"全稿共 {lo}–{hi} 页，不得超过 {hi} 页，不要为凑页数补充无关内容。"]
     if form == "ranking":
-        n = int(rank or 10)
+        if rank:
+            n = int(rank)
+            head = (f'这是具体对象的排行榜，共{n}个不重复对象，禁止把对象换成类别、档位或教程。'
+                    f'可分配在多张 visual.kind=rank 版面中；所有版面 items 总数恰好{n}。'
+                    f'每条 rank 填全稿连续名次1～{n}，')
+        else:
+            head = ('这是具体对象的排行榜，对象数量按资料能完整列出的真实数量决定，'
+                    '不要把数量凑成固定值，也不要把对象换成类别、档位或教程。'
+                    '可分配在多张 visual.kind=rank 版面中；每条 rank 填全稿连续名次，')
         parts.append(
-            f'这是具体对象的排行榜，共{n}个不重复对象，禁止把对象换成类别、档位或教程。'
-            f'可分配在多张 visual.kind=rank 版面中；所有版面 items 总数恰好{n}。'
-            f'每条 rank 填全稿连续名次1～{n}，label 写对象全名（最多80字，不重复写编号），'
+            head
+            + 'label 写对象全名（最多80字，不重复写编号），'
             'detail 写入选理由与实际热度指标（最多64字）。'
             '只有1页时该页就是完整排行榜，不另做封面；2页可做封面+完整榜单，或两页分列名次。'
             + (f'本平台封面约定：{cover_instruction(platform)}' if platform else '')
@@ -311,7 +319,7 @@ MASTER_SCHEMA: dict[str, Any] = {
         "actions": {"type": "array", "items": {"type": "string"}},
         "pages": {
             "type": "array",
-            "minItems": 3,
+            "minItems": 1,
             "items": {
                 "type": "object",
                 "properties": {
@@ -337,7 +345,7 @@ VARIANT_SCHEMA: dict[str, Any] = {
         "caption": {"type": "string"},
         "pages": {
             "type": "array",
-            "minItems": 3,
+            "minItems": 1,
             "items": {
                 "type": "object",
                 "properties": {
@@ -492,7 +500,8 @@ class ComposeService:
                        + "；".join(_brief_get(brief, 'framework', []) or []) + "。")
             if form in {'ranking','directory'}:
                 n = _brief_get(brief, 'rank_count') or _brief_get(brief,'item_count')
-                prompt += (f"\n这是排行或速查选题：母稿必须为速查版面准备恰好 {n or 10} 条可列出、"
+                scope = f"恰好 {n} 条" if n else "可完整列出的数量"
+                prompt += (f"\n这是排行或速查选题：母稿必须为速查版面准备{scope}可列出、"
                            "彼此不重复的具体对象，不要把编辑口径误读成「不能做榜单」而放弃枚举。")
         if repair_feedback:
             prompt += f"\n上一轮不合格原因（必须修正）：{repair_feedback}"
@@ -587,7 +596,12 @@ class ComposeService:
         pages = raw.get("pages") or []
         min_pages, max_pages = _master_page_range(brief)
         if len(pages) < min_pages:
-            raise ValidationFailed(f"母稿页数 {len(pages)} 少于 {min_pages}")
+            # 下限只可能是用户显式要求的页数或 1（拒绝空稿）；
+            # 不再有「至少 N 页」这类用户没要求的编辑策略下限。
+            raise ValidationFailed(
+                "母稿没有任何页" if not pages
+                else f"母稿页数 {len(pages)} 少于用户要求的 {min_pages} 页"
+            )
         if max_pages is not None and len(pages) > max_pages:
             raise ValidationFailed(
                 f"母稿页数 {len(pages)} 多于用户要求的 {max_pages} 页，请合并到 {max_pages} 页以内"
@@ -783,7 +797,11 @@ class ComposeService:
     def _generate_ranking_text(self,master,platform,strategy,brief,content_id,run_mode,requirements,feedback,round_no):
         # The model owns prose. The application owns quantity, numbering, pages and visual types.
         ranking=_is_ranking(brief)
-        n=int((_brief_get(brief,'rank_count') if ranking else _brief_get(brief,'item_count')) or 10)
+        explicit=(_brief_get(brief,'rank_count') if ranking else _brief_get(brief,'item_count'))
+        n=int(explicit or 10)
+        # 只有用户显式写了数量（TOP10 / 15 项）才把条数钉死；否则交给资料的真实数量。
+        item_span=({'min_length':int(explicit),'max_length':int(explicit)} if explicit
+                   else {'min_length':1,'max_length':16})
         cap_max=_brief_get(brief,'caption_max') or 850
         from .catalog_compiler import EditorialRow as Row
         class RankingText(BaseModel):
@@ -794,11 +812,14 @@ class ComposeService:
             order_note:str=Field(min_length=1,max_length=25)
             source_note:str=Field(min_length=1,max_length=40)
             takeaway:str=Field(min_length=1,max_length=56)
-            items:list[Row]=Field(min_length=n if ranking or _brief_get(brief,'item_count') else 1,max_length=n if ranking or _brief_get(brief,'item_count') else 16)
+            items:list[Row]=Field(**item_span)
         schema=RankingText.model_json_schema()
         if _brief_get(brief,'detail_max'):schema['$defs']['EditorialRow']['properties']['detail']['maxLength']=min(48,_brief_get(brief,'detail_max'))
         schema['properties']['caption']['maxLength']=cap_max
-        prompt=(f'为{platform}写'+(f'完整TOP{n}榜单文本。' if ranking else f'分类速查表，完整列出{n}项。' if _brief_get(brief,'item_count') else '分类速查表，具体对象最多16项。')+'只写指定文字字段与items，不输出pages、visual或排版代码。'
+        target=(f'完整TOP{n}榜单文本。' if ranking and explicit
+                else ('完整榜单文本，对象数量按资料能完整列出的真实数量决定，不要凑成固定条数。' if ranking
+                      else (f'分类速查表，完整列出{n}项。' if explicit else '分类速查表，把资料里的具体对象完整列出。')))
+        prompt=(f'为{platform}写'+target+'只写指定文字字段与items，不输出pages、visual或排版代码。'
             '程序负责页数和名次；items数组顺序即最终名次，必须保留资料的指定顺序和具体对象。'
             'label只写对象完整名称，不加序号，程序会单独显示名次。'
             '每项写具体名称、主要用途，icon从枚举选，tags最多3个且每个最多10字，category用同一分类维度。排行不能以类别代替对象。'
@@ -1012,7 +1033,7 @@ class ComposeService:
             count=_brief_get(brief,'item_count')
             texts=list(dict.fromkeys(t.strip() for p in master.pages for t in p.points if t.strip()))
             if count and len(texts)!=count:raise ValidationFailed(f'分类速查需要{count}项，母稿提供{len(texts)}项；本地演练不编造对象')
-            if not texts or len(texts)>16:raise ValidationFailed('分类速查需要1～16项')
+            if not texts:raise ValidationFailed('分类速查需要至少1项具体对象')
             rows=[]
             for text in texts:
                 label,sep,detail=text.partition('：')

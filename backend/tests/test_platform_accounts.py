@@ -1,8 +1,9 @@
 """Account connection contracts, browser lifecycle and access boundaries.
 
 No real login, model call, publishing or cookie export occurs in this test.
-Access boundary: same-origin + anti-CSRF + anti-DNS-rebinding are always enforced;
-"loopback client only" is configurable and off by default since 2026-10-09.
+Access boundary: same-origin + anti-CSRF are always enforced; Host checking
+(anti-DNS-rebinding) and "loopback client only" are both configurable and off
+by default since 2026-10-09 / 2026-10-10.
 """
 from datetime import datetime, timezone
 import json
@@ -22,6 +23,7 @@ os.environ.update(CWB_STORAGE_ROOT=str(workspace), CWB_DATABASE_URL=f"sqlite:///
 from fastapi.testclient import TestClient
 from app.main import app
 from app.api.accounts import service
+from app.core.config import get_settings
 from app.services.platform_account import DOUYIN_URL, classify_login, read_json, write_json
 
 passed = 0
@@ -47,7 +49,17 @@ check("foreign origin blocked on POST", client.post("/api/v1/accounts/douyin/con
 check("different port blocked", client.post("/api/v1/accounts/douyin/connect", headers={**headers, "Origin":"http://testserver:1"}).status_code == 403)
 check("missing action header blocked", client.post("/api/v1/accounts/douyin/connect").status_code == 403)
 check("cross-site browser blocked", client.post("/api/v1/accounts/douyin/connect", headers={**headers,"Sec-Fetch-Site":"cross-site"}).status_code == 403)
-check("DNS rebinding host blocked", client.get("/api/v1/accounts/douyin", headers={"Host":"evil.invalid"}).status_code == 403)
+# 2026-10-10 起：CWB_ALLOWED_HOSTS 默认 `*`，不做 Host 校验（用公网 IP / 自有域名访问不想被 403）。
+# 代价是防 DNS rebinding 的这道 Host 校验默认失效；同源 Origin、跨站拒绝、写操作自定义头仍在。
+check("default wildcard lets any host through",
+      client.get("/api/v1/accounts/douyin", headers={"Host":"evil.invalid"}).status_code == 200)
+_strict_hosts = get_settings().allowed_hosts
+try:
+    get_settings().allowed_hosts = ""
+    check("DNS rebinding host blocked once wildcard removed",
+          client.get("/api/v1/accounts/douyin", headers={"Host":"evil.invalid"}).status_code == 403)
+finally:
+    get_settings().allowed_hosts = _strict_hosts
 # 2026-10-09 起：非回环客户端默认放行，否则局域网/内网里其它设备打开工作台会到处 403
 # （用户实际遇到的是 /studio/options 被拦，界面显示"创作设置未读取：账号连接只允许本机访问"）。
 # 依据：只绑 127.0.0.1 时远程根本连不上，能收到非回环请求本身就说明运维方主动暴露了服务。
@@ -65,9 +77,8 @@ check("LAN client still blocked on foreign origin",
       lan.get("/api/v1/accounts/douyin", headers={"Origin":"https://evil.invalid"}).status_code == 403)
 check("LAN client still blocked as cross-site",
       lan.post("/api/v1/accounts/douyin/connect", headers={**lan_origin,"Sec-Fetch-Site":"cross-site"}).status_code == 403)
-check("LAN client cannot smuggle a foreign host into the rebinding check",
-      lan.get("/api/v1/accounts/douyin", headers={"Host":"evil.invalid"}).status_code == 403)
-from app.core.config import get_settings
+check("LAN client with a foreign host follows the same host policy as any client",
+      lan.get("/api/v1/accounts/douyin", headers={"Host":"evil.invalid"}).status_code == 200)
 _previous = get_settings().allow_remote_access
 get_settings().allow_remote_access = False
 try:
@@ -94,9 +105,16 @@ try:
               "/api/v1/studio/options").status_code == 200)
     check("explainer page reachable by machine name",
           by_name.get("/views/PlatformAccounts.html").status_code == 200)
-    # 被拒时必须把当前 Host 写进文案，用户照着加即可，不用来猜是哪条规则。
+    # 默认 `CWB_ALLOWED_HOSTS=*`：任何 Host 都放行，公网 IP / 自有域名不再被拦。
+    check("默认全开时外来域名不再被 Host 校验拦下",
+          by_name.get("/api/v1/studio/options", headers={"Host": "cwb.example.com"}).status_code == 200)
+    check("默认全开时公网 IP 也能访问",
+          TestClient(app, base_url="http://47.96.185.149:8000").get(
+              "/api/v1/studio/options").status_code == 200)
+    # 显式收紧（去掉 `*`）后恢复严格模式，并且仍把当前 Host 写进文案，用户照着加即可。
+    get_settings().allowed_hosts = ""
     rejected = by_name.get("/api/v1/studio/options", headers={"Host": "cwb.example.com"})
-    check("外来域名仍然被拦下并报出当前地址",
+    check("收紧后外来域名被拦下并报出当前地址",
           rejected.status_code == 403
           and "cwb.example.com" in rejected.json()["detail"]
           and "CWB_ALLOWED_HOSTS" in rejected.json()["detail"])

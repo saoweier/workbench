@@ -56,15 +56,20 @@ def _metric_problems(items: list[dict], sources) -> list[str]:
 
 
 def rank_contract(pages, rank_count, *, sources=None) -> dict:
-    """榜单专项验收。返回结构化结果，供平台稿校验与交付物清单共用。"""
-    want = int(rank_count or 10)
+    """榜单专项验收。返回结构化结果，供平台稿校验与交付物清单共用。
+
+    条目数只在**用户显式写了数量**（TOP10 / 前五 …）时才作为硬约束；
+    没写就只要求至少一条、名次连续、对象不重复，不替用户钉死条数。
+    """
     rank_pages = [p for p in (pages or []) if (p.get("visual") or {}).get("kind") == "rank"]
     items = _rank_items(pages)
+    explicit = rank_count not in (None, "")
+    want = int(rank_count) if explicit else len(items)
     names = [_norm_label(i.get("label")) for i in items]
     ranks = [i.get("rank") for i in items]
     metric_problems = _metric_problems(items, sources)
 
-    count_ok = len(items) == want
+    count_ok = (len(items) == want) if explicit else bool(items)
     unique_ok = len(set(names)) == len(names)
     order_ok = ranks == list(range(1, len(items) + 1))
 
@@ -75,8 +80,10 @@ def rank_contract(pages, rank_count, *, sources=None) -> dict:
          "passed": bool(rank_pages),
          "problem": "排行榜题材缺少名次版面（visual.kind=rank）"},
         {"key": "rank_count", "code": "RANK_COUNT_MISMATCH", "label": "榜单项数",
-         "expected": want, "actual": len(items), "passed": count_ok,
-         "problem": f"排行榜需要 {want} 条名次，实际只有 {len(items)} 条"},
+         "expected": want if explicit else "按资料完整列出",
+         "actual": len(items), "passed": count_ok,
+         "problem": (f"排行榜需要 {want} 条名次，实际只有 {len(items)} 条" if explicit
+                     else "排行榜没有任何条目")},
         {"key": "rank_unique", "code": "RANK_DUPLICATE_OBJECT", "label": "对象互不重复",
          "expected": len(items), "actual": len(set(names)), "passed": unique_ok,
          "problem": "排行榜存在重复对象，必须完整列出互不重复的具体对象"},

@@ -41,6 +41,18 @@
   </div>
 
   <div class="card" style="margin-bottom:16px">
+    <h2>当前接口能不能用</h2>
+    <div class="hint">不用记 config_id：这里直接校验你现在<b>实际生效</b>的那条接口，并告诉你为什么不能用、怎么修。</div>
+    <div class="hint" id="active-status" style="margin:6px 0">读取中…</div>
+    <div class="actions">
+      <button id="active-check">校验当前接口（本地，不出网）</button>
+      <button class="primary" id="active-net">真实连通测试（会产生极小消耗）</button>
+      <button id="active-refresh">刷新状态</button>
+    </div>
+    <div class="hint" id="active-msg" style="margin-top:8px"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
     <h2>运行模式（run_mode）</h2>
     <div class="hint">同一条链路的三种来源，界面上始终标明当前用的是哪一种，不混淆。</div>
     <div class="kv"><span><code>real</code> 真实调用</span><span>调用已配置的 Provider，按实际回传记账</span></div>
@@ -298,6 +310,36 @@ function renderConfigs(d) {
   if (caps.search?.note) log(`搜索：${caps.search.note}`);
 }
 
+function renderActiveStatus(s) {
+  const rows = [["text", "文字模型"], ["search", "搜索服务"], ["image", "图片模型"]];
+  document.getElementById("active-status").innerHTML = rows.map(([k, label]) => {
+    const v = s ? s[k] : null;
+    if (!v) return `<div class="kv"><span>${esc(label)}</span><span class="missing">未配置，不会调用</span></div>`;
+    const ok = v.status === "available", bad = v.status === "error";
+    return `<div class="kv"><span>${esc(label)}</span><span>`
+      + `<span class="chip ${ok ? "ok" : bad ? "warn" : ""}">${esc(v.status)}</span> `
+      + `<code>${esc(v.model_id || "—")}</code> · <code>${esc(v.base_url || "")}</code>`
+      + (v.last_test_message ? ` <span class="missing">${esc(v.last_test_message)}</span>` : "")
+      + `</span></div>`;
+  }).join("");
+}
+
+async function checkActive(dryRun) {
+  const r = await api.post("/provider-configs/active-test", { kind: "text", dry_run: dryRun });
+  const hints = (r.hints || []).join(" ");
+  document.getElementById("active-msg").innerHTML = r.ok
+    ? `<span class="chip ok">能用</span> ${esc(r.message || "")}`
+    : `<span class="chip warn">${dryRun ? "本地校验未通过" : "不能用"}</span> ${esc(r.message || "")} ${esc(hints)}`;
+  log(`当前接口校验（${dryRun ? "本地" : "真实"}）：ok=${r.ok}，status=${r.status || "—"}。${r.message || ""}`,
+      r.ok ? "ok" : "err");
+  if (dryRun) toast(r.ok ? "本地校验通过，未出网、无费用。" : "本地校验未通过，请看原因。", r.ok ? "ok" : "warn");
+  else { toast(r.message || "真实测试完成。", r.ok ? "ok" : "warn"); await load(); }
+}
+
+async function refreshActiveStatus() {
+  renderActiveStatus(await api.get("/provider-configs/status"));
+}
+
 function renderCost(d, usage) {
   const money = d?.money_limit_set;
   const reported = usage?.real?.reported_micro_by_currency || {};
@@ -352,8 +394,17 @@ const load = guard(async () => {
   renderCost(d, usage);
   PROFILES = pf;
   renderProfile(pf);
+  refreshActiveStatus().catch(() => {});
   log(`成本模式 ${d.cost_mode}；金额上限${d.money_limit_set ? "已设" : "未设（null ≠ 0）"}。`);
 });
+
+document.getElementById("active-refresh").onclick = guard(refreshActiveStatus);
+document.getElementById("active-check").onclick = guard(() => checkActive(true));
+document.getElementById("active-net").onclick = guard(async () => {
+  if (!confirm("真实连通测试会向当前生效的文字接口发起 1 次最小探测调用，可能产生实际消耗。继续？")) return;
+  await checkActive(false);
+});
+refreshActiveStatus().catch(() => {});
 
 /* ------------------------------------------------------------ 保存/测试 */
 

@@ -33,7 +33,8 @@ class MemeText(BaseModel):
     classic_quote:MemeRow
     meaning:MemeRow
     formula:MemeRow
-    examples:list[MemeRow]=Field(min_length=3,max_length=3)
+    # 例句条数由用户要求决定（见 requested_examples），不再写死 3 条。
+    examples:list[MemeRow]=Field(min_length=1)
 
 def compile_meme(words,claim_ids):
     pages=[]

@@ -22,13 +22,16 @@ def compile_rows(words,*,strategy,brief,claim_ids,sources,ranking,verify_objects
     import re
     words=deepcopy(words)
     rows=words['items'];wanted=brief.get('rank_count') if ranking else brief.get('item_count')
+    # 页数先算出来：条目容量是「一屏能放几行 × 页数」，属版式物理容量，
+    # 不是编辑策略上限。用户没写数量时不钉条数，只按资料真实数量排版。
+    count=max(strategy['min_pages'],min(2,strategy['max_pages']))
     if ranking:
         for n,row in enumerate(rows,1):
             # Remove only a redundant generated ordinal matching this row's
             # program-owned rank, never digits inside the actual title.
             row['label']=re.sub(r'^0?'+str(n)+r'(?:[.、）)]\s*|\s+)', '',row['label']).strip()
     if wanted and len(rows)!=wanted:raise ValidationFailed(f'需要完整{wanted}项，不能增减对象')
-    if not 1<=len(rows)<=(12 if ranking else 16):raise ValidationFailed('条目数超出版式容量')
+    if not 1<=len(rows)<=(12 if ranking else 16)*max(1,count):raise ValidationFailed('条目数超出当前页数的版式容量；请增加页数或减少条目')
     if len({r['label'].strip().casefold() for r in rows})!=len(rows):raise ValidationFailed('存在重复对象')
     for row in rows:
         if any(not t.strip() or len(t)>10 for t in row.get('tags',[])):raise ValidationFailed('用途标签最多10字，不能为空')
@@ -62,7 +65,6 @@ def compile_rows(words,*,strategy,brief,claim_ids,sources,ranking,verify_objects
 
     # A multi-page overview uses every page for rows, never adds a redundant cover.
     # `cover=False`（抖音）不设封面版式：名次/分类版面整页铺开，第一页也是内容页。
-    count=max(strategy['min_pages'],min(2,strategy['max_pages']))
     if count>len(rows):raise ValidationFailed('页面比条目更多，不能以空页凑篇幅')
     pages=[]
     for group in range(count):

@@ -153,6 +153,117 @@ async def test_provider_config(config_id: str, dry_run: bool = True) -> dict:
     return result
 
 
+# ---------------------------------------------------------------- 当前接口校验
+#
+# 上面那个 /test 需要先知道 config_id，用户在设置页填完 Key 之后往往不知道该点哪个、
+# 也不知道「现在实际会用哪一条」。下面两个端点直接回答「我现在配的这个能不能用」，
+# 不需要 config_id，用与生产链路同一套选择逻辑（_pick）挑出真正生效的配置。
+
+_KIND_LABEL = {
+    ProviderKind.TEXT.value: "文字模型",
+    ProviderKind.SEARCH.value: "搜索服务",
+    ProviderKind.IMAGE.value: "图片模型",
+}
+
+#: 错误码 → 用户能直接照做的排查建议
+_ERROR_HINTS = {
+    "MISSING_KEY": "没有填写 API Key，请在配置里补上密钥。",
+    "AUTH": "密钥被拒绝（401/403）：检查 Key 是否正确、是否过期、是否有该模型的调用权限。",
+    "RATE_LIMIT": "被限流（429）：稍后再试，或检查账号额度与并发限制。",
+    "SERVER_ERROR": "服务商返回错误状态：确认 base_url 填的是接口根地址（如 https://api.xxx.com/v1），不要重复写 /chat/completions。",
+    "NETWORK_TIMEOUT": "连接超时：确认该地址能从本机访问，以及是否需要代理。",
+    "BAD_JSON": "返回的不是预期 JSON：base_url 很可能不是 OpenAI 兼容的 chat/completions 接口。",
+    "EMPTY": "服务商返回内容为空。",
+    "OUTPUT_LIMIT": "输出被截断，连通性正常但需调大输出上限。",
+    "ADAPTER_NOT_IMPLEMENTED": "该适配器类型尚未实现，请换用 OpenAI 兼容接口。",
+    "BAD_URL": "base_url 不是合法的 http(s) 地址。",
+}
+
+
+def _active_cfg(kind: ProviderKind):
+    if kind == ProviderKind.TEXT:
+        return _runtime.text_provider()
+    if kind == ProviderKind.SEARCH:
+        return _runtime.search_provider()
+    if kind == ProviderKind.IMAGE:
+        return _runtime.image_provider()
+    return None
+
+
+def _kind_view(cfg) -> dict | None:
+    if cfg is None:
+        return None
+    return {
+        "id": cfg.id, "name": cfg.name, "adapter_type": cfg.adapter_type.value,
+        "model_id": cfg.model_id, "base_url": cfg.base_url,
+        "status": cfg.status().value,
+        "last_test_status": cfg.last_test_status.value,
+        "last_test_at": cfg.last_test_at.isoformat() if cfg.last_test_at else None,
+        "last_test_message": cfg.last_test_message,
+    }
+
+
+@router.get("/provider-configs/status")
+async def active_provider_status() -> dict:
+    """一眼看清「现在实际会用哪条接口、配好没有」。**不发起任何网络调用**。"""
+    text, search, image = _runtime.text_provider(), _runtime.search_provider(), _runtime.image_provider()
+    text_key_ok = bool(text and text.secret_ref and _runtime.secrets.get(text.secret_ref))
+    return {
+        "text_ready": bool(text and text.model_id and text_key_ok),
+        "search_ready": search is not None,
+        "image_ready": image is not None,
+        "text": _kind_view(text),
+        "search": _kind_view(search),
+        "image": _kind_view(image),
+    }
+
+
+class ActiveTestIn(BaseModel):
+    kind: ProviderKind = ProviderKind.TEXT
+    dry_run: bool = True
+
+
+@router.post("/provider-configs/active-test")
+async def test_active_provider(payload: ActiveTestIn = Body(default=ActiveTestIn())) -> dict:
+    """校验**当前已生效**的接口能不能真正用起来（不需要 config_id）。
+
+    - dry_run=true（默认）：只做本地校验——地址、模型名、密钥是否齐全，**不出网、不花钱**。
+    - dry_run=false：发起一次最小真实调用（例如给文字模型发一个 "ping"），
+      **会产生实际消耗**，响应里明确标注。
+
+    返回 `ok`（能否用）、`status`、`message`（为什么不能）、`hints`（怎么修）。
+    """
+    kind = payload.kind
+    label = _KIND_LABEL.get(kind.value, kind.value)
+    cfg = _active_cfg(kind)
+    if cfg is None:
+        return {
+            "ok": False, "status": ProviderStatus.UNCONFIGURED.value, "kind": kind.value,
+            "called_provider": False, "run_mode": RunMode.LOCAL_SEED.value,
+            "message": f"没有找到已启用的{label}配置：当前不会调用任何{label}。",
+            "hints": [f"在下方「新增配置」里填写 {label} 的 base_url、model_id 与 API Key，并勾选启用后保存。"],
+        }
+
+    result = _runtime.test_connection(cfg, dry_run=payload.dry_run)
+    result.update({
+        "kind": kind.value,
+        "config_id": cfg.id,
+        "name": cfg.name,
+        "model_id": cfg.model_id,
+        "base_url": cfg.base_url,
+    })
+    if payload.dry_run:
+        result["ok"] = result.get("status") == ProviderStatus.CONFIGURED_UNTESTED.value
+        result.setdefault("hints", []).append(
+            "本地校验只说明配置填齐了；要确认真能连通，请用「真实连通测试」（会产生一次极小消耗）。")
+    else:
+        result["ok"] = result.get("status") == ProviderStatus.AVAILABLE.value
+        if not result["ok"]:
+            result.setdefault("hints", []).append(
+                _ERROR_HINTS.get(result.get("error_code") or "", "查看 error_code 与错误信息。"))
+    return result
+
+
 class SearchProbeIn(BaseModel):
     query: str = Field(min_length=1, max_length=500)
     read_articles: bool = True

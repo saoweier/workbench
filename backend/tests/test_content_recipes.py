@@ -53,7 +53,8 @@ check('visual style selection preserves explicit TOP10',apply_recipe(build_brief
 check('public source URL accepted as prose',_looks_like_dangerous('来源 https://github.com/JackyST0/hotpush') is None)
 check('absolute path remains blocked',_looks_like_dangerous('读取 /etc/passwd')=='绝对路径')
 check('unknown templates rejected',rejects(lambda:apply_recipe(build_brief(topic='内容整理'),template_id='foreign')))
-check('over-capacity directory is not truncated',rejects(lambda:build_brief(topic='17个技能分类速查表')))
+over=build_brief(topic='17个技能分类速查表')
+check('explicit 17-row directory is accepted without truncation',over.form=='directory' and over.item_count==17)
 row={'label':'示例Skill01','detail':'用于信息整理','icon':'source','category':'信息调研','tags':['资料整理'],'metric_text':'101次','metric_label':'示例累计安装','metric_source_id':'U01'}
 sources=[{'id':'U01','access_state':'ok','excerpt':'示例Skill01 101次；示例累计安装，2026-10-01，非真实统计。'}]
 check('metric transcription has source and matching object',validate_metrics([row],sources))

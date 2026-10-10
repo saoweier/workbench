@@ -192,7 +192,7 @@ class CreativeBrief(BaseModel):
     template_id: str = 'illustrated'
     template_version: int = 4
     template_package: dict | None = None
-    item_count: int | None = Field(default=None,ge=1,le=16)
+    item_count: int | None = Field(default=None,ge=1)
     form_name: str
     theme: str
     framework: list[str] = Field(default_factory=list)
@@ -209,9 +209,9 @@ class CreativeBrief(BaseModel):
     original_topic: str = ""
     original_requirements: str = ""
     time_range: str | None = None
-    caption_min: int | None = Field(default=None,ge=1,le=2200)
-    caption_max: int | None = Field(default=None,ge=1,le=2200)
-    detail_max: int | None = Field(default=None,ge=1,le=64)
+    caption_min: int | None = Field(default=None,ge=1)
+    caption_max: int | None = Field(default=None,ge=1)
+    detail_max: int | None = Field(default=None,ge=1)
 
     def strategy_pages(self) -> tuple[int, int] | None:
         """返回用户显式页数预算；未指定时为 None（不覆盖平台策略）。"""
@@ -275,16 +275,15 @@ def parse_caption_budget(text: str) -> tuple[int | None, int] | None:
     matches=list(re.finditer(prefix+r'(\d{1,4})\s*[~～\-—–至到]\s*(\d{1,4})\s*字',t))
     if matches:
         a,b=map(int,matches[-1].groups());lo,hi=min(a,b),max(a,b)
-        if not lo or hi>2200:
-            from ..core.errors import ValidationFailed
-            raise ValidationFailed('发布文案字数范围须为1～2200字')
+        # 用户自己写多少就按多少，不再用 2200 字之类的外部上限替他决定。
+        if not lo:
+            return None
         return lo,hi
     matches=list(re.finditer(prefix+r'(?:不超过|最多|至多|限|控制在)\s*(\d{1,4})\s*字',t))
     if matches:
         hi=int(matches[-1].group(1))
-        if not 1<=hi<=2200:
-            from ..core.errors import ValidationFailed
-            raise ValidationFailed('发布文案字数上限须为1～2200字')
+        if hi < 1:
+            return None
         return None,hi
     return None
 
@@ -313,10 +312,8 @@ def parse_detail_limit(text):
     matches=list(re.finditer(r'(?:每[条项张]的?)?(?:详情|detail|卡片说明)[^。；;\n]{0,8}?(?:不超过|不得超过|最多|不超|限|控制在)\s*(\d{1,2})\s*(?:字|字符)',text or '',re.I))
     if not matches:return None
     value=int(matches[-1].group(1))
-    if not 1<=value<=64:
-        from ..core.errors import ValidationFailed
-        raise ValidationFailed('卡片详情字数上限须为1～64字符')
-    return value
+    # 用户写多少就按多少，不再强加 64 字上限。
+    return value if value >= 1 else None
 
 
 def _clamp_rank(n: int) -> int | None:
@@ -377,11 +374,8 @@ def build_brief(*, topic: str, requirements: str = "", outline=(), audience: str
     budget = parse_page_budget(notes) or parse_page_budget(topic)
     form_id = detect_form(topic, notes, outline)
     rank_count = parse_rank_count(notes,explicit_only=True) or parse_rank_count(topic,explicit_only=True) or parse_rank_count(notes) or parse_rank_count(topic)
-    if form_id == 'ranking' and rank_count is None:
-        rank_count = 10
-    if form_id == 'ranking' and rank_count > 12:
-        from ..core.errors import ValidationFailed
-        raise ValidationFailed('当前排行榜支持 TOP1～TOP12，请明确缩小数量；系统不会擅自减少条目。')
+    # 只有用户真的写了数量（TOP10 / 前五 / 15 项）才把条数当作硬约束；
+    # 没有写就不替他决定条数，交给资料能完整列出的真实数量。
     period = None
     if '上个月' in topic + notes or '上月' in topic + notes:
         from datetime import datetime, timedelta
@@ -389,9 +383,6 @@ def build_brief(*, topic: str, requirements: str = "", outline=(), audience: str
         end = current - timedelta(days=1)
         period = f'{end.replace(day=1).isoformat()} 至 {end.isoformat()}（自然月，不等同于滚动30天）'
 
-    if form_id=='directory' and rank_count and rank_count>16:
-        from ..core.errors import ValidationFailed
-        raise ValidationFailed('分类速查表最多16项，不会擅自减少条目。')
     caption_budget=parse_caption_budget(notes)
     form = FORMS[form_id]
     page_min, page_max = (budget if budget else (None, None))

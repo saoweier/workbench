@@ -27,7 +27,7 @@
 - 压缩包附 Windows 64位 Python 3.13 的离线依赖。其他机器需先安装 Python 3.11–3.13 和 Chrome/Edge；Python 3.13 可使用附带依赖离线安装，其他版本需联网安装依赖。
 - `install.bat` 安装/修复，`stop.bat` 停止本项目，`test.bat` 执行隔离回归，不调用你的API、不修改你的业务库。
 - 换端口可运行 `start.bat --port 8001`。改监听地址用 `start.bat --host 127.0.0.1`（只本机）或 `--host 0.0.0.0`（默认，局域网可访问），也可设环境变量 `CWB_HOST`。`restart-api` 会沿用启动时的地址。
-- 用自己的域名或反向代理访问时，把域名写进环境变量 `CWB_ALLOWED_HOSTS`（逗号分隔），否则会被防 DNS rebinding 的 Host 校验拦下；拦下时的 403 会写明当前地址。
+- Host 校验默认全开（`CWB_ALLOWED_HOSTS=*`），用公网 IP、自有域名或反向代理域名访问都不会被 403。想恢复严格的防 DNS rebinding 行为，把域名写进环境变量 `CWB_ALLOWED_HOSTS`（逗号分隔，去掉 `*`）；那时被拦下的 403 会写明当前地址，照它加即可。
 - 启动日志：`storage/logs/api.log`、`storage/logs/worker.log`。
 - 备份：`.venv\Scripts\python scripts\backup.py`。
 - 恢复：先 `stop.bat`，再 `.venv\Scripts\python scripts\restore.py <备份文件>`。恢复前自动保留快照；备份排除密钥，换机器请重新配置。
