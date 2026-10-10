@@ -84,8 +84,10 @@ class TrendBoards:
         return board
     def _stream(self):
         base=self.config()['base_url'];deadline=time.monotonic()+100;size=0;event='';lines=[];seen=set()
+        from .network_policy import proxies_apply
         try:
-            with httpx.Client(timeout=httpx.Timeout(12,read=35),trust_env=False,follow_redirects=False) as client:
+            # HotPush 多为局域网内服务：本机/内网地址直连，公网地址才交给系统代理。
+            with httpx.Client(timeout=httpx.Timeout(12,read=35),trust_env=proxies_apply(base),follow_redirects=False) as client:
                 with client.stream('GET',base+'/api/hot/stream',headers={'Accept':'text/event-stream'}) as response:
                     if response.status_code!=200:raise ValueError('HotPush返回HTTP '+str(response.status_code))
                     for line in response.iter_lines():

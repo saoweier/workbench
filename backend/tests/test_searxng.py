@@ -165,6 +165,46 @@ with patch.object(runtime,'search') as search,patch('app.services.public_researc
 check('configured search revisions reuse frozen readable evidence',not search.called and not fallback.called and not reused.search_executed)
 check('reuse is disclosed rather than claimed as fresh search',any('未重新检索' in note for note in reused.limitations))
 
+# ---- 本机地址绝不能被系统代理接管 ----------------------------------------
+# httpx 默认 trust_env=True：环境里只要有 HTTP_PROXY，连 http://127.0.0.1:8088
+# 也会被送去代理。代理连不上目标时返回 502，于是「实例根本没启动」被说成
+# 「SearXNG 返回 HTTP 502；未跟随跳转」，用户会跑去核对地址是不是填错了。
+from app.services.network_policy import proxies_apply
+from app.services.adapters.http_transport import HttpTransport
+check('本机回环地址不使用系统代理',proxies_apply('http://127.0.0.1:8088') is False)
+check('localhost 不使用系统代理',proxies_apply('http://localhost:8088') is False)
+check('IPv6 回环不使用系统代理',proxies_apply('http://[::1]:8088') is False)
+check('内网地址不使用系统代理',proxies_apply('http://192.168.1.9:3001') is False)
+check('公网地址仍交给系统代理',proxies_apply('https://cn.bing.com/search') is True)
+
+client_kwargs=[]
+class FakeResponse:
+    status_code=200
+    text='{"ok":true}'
+    headers={}
+    def json(self):return {'ok':True}
+class FakeClient:
+    def __init__(self,**kw):client_kwargs.append(kw)
+    def __enter__(self):return self
+    def __exit__(self,*a):return False
+    def request(self,*a,**kw):return FakeResponse()
+with patch('app.services.adapters.http_transport.httpx.Client',FakeClient):
+    HttpTransport().request('GET','http://127.0.0.1:8088/search',headers={})
+    HttpTransport().request('GET','https://api.example.com/v1/chat/completions',headers={})
+check('传输层对本机地址关闭环境代理',client_kwargs[0]['trust_env'] is False)
+check('传输层对公网地址保留环境代理',client_kwargs[1]['trust_env'] is True)
+
+with patch('app.services.source_reader.validate_public_url'):
+    local=cfg(allow_localhost=True,search_language='zh-CN')
+    proxy_hit=SearXNGAdapter(local,transport=Transport(status=502)).search('特斯拉')
+    remote_hit=SearXNGAdapter(cfg(base_url='https://searx.example.com',allow_localhost=False),transport=Transport(status=502)).search('特斯拉')
+    refused=SearXNGAdapter(local,transport=Transport(error=ConnectionRefusedError('refused'))).search('特斯拉')
+check('本机地址上的 502 指向代理/网关而不是 SearXNG 自己',
+      not proxy_hit.ok and '代理' in proxy_hit.error_message and 'SearXNG 返回 HTTP 502' not in proxy_hit.error_message)
+check('公网实例的 502 才指向实例与上游引擎','上游' in remote_hit.error_message)
+check('连不上时点名地址与端口，而不是含糊的“无法连接”',
+      not refused.ok and '127.0.0.1:8088' in refused.error_message and '没有服务在监听' in refused.error_message)
+
 frontend=(ROOT/'frontend/src/views/ApiSettings.html').read_text(encoding='utf-8')
 check('UI exposes native SearXNG and real search diagnostics','value="searxng"' in frontend and 'search-probe' in frontend)
 check('deployment only listens on the host loopback','127.0.0.1:8088:8080' in (ROOT/'deploy/searxng/compose.yml').read_text())

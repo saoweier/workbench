@@ -60,11 +60,12 @@ $s.Speak([System.IO.File]::ReadAllText($env:CWB_NARRATION_FILE,[System.Text.Enco
             raise ValueError('请先配置并启用语音 API。')
         key=SecretStore(settings.secret_store_path).get(cfg.secret_ref)
         if not key:raise ValueError('语音 API 尚未设置密钥。')
-        from .network_policy import validate_url
+        from .network_policy import validate_url,proxies_apply
         validate_url(cfg.base_url,allow_localhost=cfg.allow_localhost)
         raw=path.with_suffix('.mp3')
         try:
-            with httpx.Client(timeout=cfg.timeout_seconds,follow_redirects=False) as client:
+            # 语音服务常跑在本机/内网：这类地址直连，不走系统代理。
+            with httpx.Client(timeout=cfg.timeout_seconds,follow_redirects=False,trust_env=proxies_apply(cfg.base_url)) as client:
                 with client.stream('POST',cfg.base_url.rstrip('/')+'/audio/speech',headers={'Authorization':'Bearer '+key},
                     json={'model':cfg.model_id,'voice':voice,'input':text,'response_format':'mp3','speed':1+rate/100}) as response:
                     if not 200<=response.status_code<300:raise ValueError(f'语音 API 返回 HTTP {response.status_code}，请检查语音模型和声音名称。')

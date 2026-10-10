@@ -95,7 +95,9 @@ def read_source_detail(url, *, allow_localhost=False, blocked_domains=(), timeou
 
 def _read_source_once(url, *, allow_localhost=False, blocked_domains=(), timeout=None):
     limit = DEFAULT_READ_TIMEOUT_SECONDS if timeout is None else float(timeout)
-    with httpx.Client(timeout=limit,follow_redirects=False) as client:
+    from .network_policy import proxies_apply
+    # 本机/内网地址直连，不走系统代理（详见 network_policy.proxies_apply）。
+    with httpx.Client(timeout=limit,follow_redirects=False,trust_env=proxies_apply(url)) as client:
       for hop in range(4):
         validate_public_url(url,allow_localhost=allow_localhost)
         host=(urlsplit(url).hostname or '').lower()

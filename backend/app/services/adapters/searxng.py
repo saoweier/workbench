@@ -54,13 +54,26 @@ class SearXNGAdapter(BaseAdapter):
             return fail('BAD_URL',str(exc))
         except TimeoutError:
             return fail('NETWORK_TIMEOUT','SearXNG 搜索超时；请检查实例及上游引擎')
-        except Exception:
-            return fail('NETWORK_TIMEOUT','无法连接 SearXNG；请检查服务是否启动及实例地址')
+        except ConnectionRefusedError:
+            return fail('NETWORK_TIMEOUT',
+                f'连不上 SearXNG（{self.cfg.base_url}）：该地址端口没有服务在监听。'
+                '请确认 SearXNG 实例已启动，且地址与端口和实例实际监听的端口一致。')
+        except Exception as exc:
+            return fail('NETWORK_TIMEOUT',f'无法连接 SearXNG（{self.cfg.base_url}）：{exc}')
         status = response.status_code
         if status == 403:
             return fail('AUTH','SearXNG 拒绝 JSON 搜索，请在 settings.yml 的 search.formats 中启用 json；也可能需要实例鉴权',status)
         if status == 429:
             return fail('RATE_LIMIT','SearXNG 实例限流，请稍后重试',status)
+        if status in {502,503,504}:
+            # 这两种成因完全相反，必须分开说：本机地址出现的 502 通常来自系统代理/网关，
+            # 而不是 SearXNG。历史上这条信息把「实例没启动」说成「SearXNG 返回 502」，
+            # 让人跑去检查地址填错——排查方向直接被带偏。
+            local = urlsplit(self.cfg.base_url).hostname in {'127.0.0.1','::1','localhost'}
+            hint = ('本机地址出现 502/503 一般不是 SearXNG 自己返回的，而是系统代理或网关挡在前面；'
+                    '请确认实例真的在该端口监听、且本机地址没有被代理接管。' if local else
+                    '请确认 SearXNG 实例本身及其上游搜索引擎是否可用。')
+            return fail('SERVER_ERROR',f'访问 SearXNG 得到 HTTP {status}（未跟随跳转）。{hint}',status)
         if status >= 400 or 300 <= status < 400:
             return fail('SERVER_ERROR',f'SearXNG 返回 HTTP {status}；未跟随跳转',status)
         body = response.json_body
