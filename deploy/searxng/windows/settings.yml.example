@@ -1,0 +1,65 @@
+# SearXNG 配置（Windows 原生运行 / 国内可用引擎）
+#
+# 拷到 <工作台>/storage/searxng/config/settings.yml 后使用。
+# 记得把 server.secret_key 换成自己生成的随机串：
+#   python -c "import secrets; print(secrets.token_hex(32))"
+#
+# 各引擎为何这样配、以及「引擎会静默退化」这一行为的实测数据，见同目录 README.md。
+
+use_default_settings:
+  engines:
+    keep_only:
+      - bing
+      - baidu
+      - sogou
+      - 360search
+      - quark
+
+general:
+  instance_name: Content Workbench Search
+
+search:
+  formats:
+    - html
+    - json
+  default_lang: auto
+
+server:
+  secret_key: __GENERATED_SECRET__
+  limiter: false
+  image_proxy: false
+
+outgoing:
+  request_timeout: 15.0
+  max_request_timeout: 25.0
+
+engines:
+  # 必须用 cn.bing.com：默认 www.bing.com 会 302，叠加 http3 后静默零结果。
+  - name: bing
+    disabled: false
+    base_url: https://cn.bing.com
+    enable_http3: false
+
+  # 百度主站（www / m.baidu.com）对本机 IP 稳定弹验证码；
+  # 走开发者搜索 kaifa.baidu.com（baidu_category: it）才有结果。
+  - name: baidu
+    disabled: false
+    baidu_category: 'it'
+    categories: [general, it, science]
+    timeout: 12.0
+
+  # 需要先打 windows/patches/sogou-antispider.patch，否则被反爬拦截时会报
+  # "unexpected crash"（AttributeError 掩盖真实原因）而不是 CAPTCHA。
+  - name: sogou
+    disabled: false
+    timeout: 12.0
+
+  - name: 360search
+    disabled: false
+    timeout: 12.0
+
+  # quark 模块默认 categories 为空，不显式给就不再参与 general 查询。
+  - name: quark
+    disabled: false
+    categories: [general]
+    timeout: 12.0

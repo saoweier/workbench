@@ -1,0 +1,37 @@
+修复 sogou 引擎把「被反爬拦截」误报成引擎崩溃。
+
+问题：当前 SearXNG 的 SXNG_Response（curl_cffi）没有 `next_request` 属性，
+      `resp.next_request` 抛 AttributeError，被上层记成 "unexpected crash"，
+      真实的 CAPTCHA / antispider 原因被掩盖，排查时会完全走错方向。
+
+用法：git -C <SEARXNG_SRC> apply sogou-antispider.patch
+
+--- a/searx/engines/sogou.py
++++ b/searx/engines/sogou.py
+@@ -50,12 +50,21 @@ def request(query, params):
+     return params
+ 
+ 
++def _is_antispider(resp):
++    """Sogou 触发人机校验时会 302 到 /antispider/。
++
++    原实现检查 `resp.next_request`，但当前 SearXNG 的 SXNG_Response（curl_cffi）
++    没有这个属性，于是抛出 AttributeError 被上层记成 "unexpected crash"，
++    真实原因（被反爬拦截）反而看不见。这里直接看 Location 头。
++    """
++    if resp.status_code not in (301, 302, 303, 307, 308):
++        return False
++    location = str(resp.headers.get("location") or "")
++    return "antispider" in location
++
++
+ def response(resp):
+-    if (
+-        resp.status_code == 302
+-        and resp.next_request is not None
+-        and str(resp.next_request.url).startswith("http://www.sogou.com/antispider")
+-    ):
++    if _is_antispider(resp):
+         raise SearxEngineCaptchaException()
+ 
+     dom = resp.html()

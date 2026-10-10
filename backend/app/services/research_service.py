@@ -29,6 +29,73 @@ from .provider_contract import ProviderCall, RunMode
 from .provider_runtime import ProviderRuntime
 
 
+# ---------------------------------------------------------------- 检索兜底
+#
+# 现象（2026-10-10 实测，cn.bing.com）：同一个实体+版本号，查询里多一个修饰词
+# 就会让引擎把它退化成对「头词」的宽泛匹配——返回一堆看起来相关、其实答不了
+# 原题的结果，而且**不报错**。例如：
+#   「Python 3.13 新特性」          → 10/10 命中官方 What's New 页
+#   「Python 3.13 有哪些新特性」    → 0 条含 3.13（返回 python.org 首页等泛化页）
+#   「Python 3.13 新特性 介绍」     → 0 条含 3.13
+#   「Python 3.13 release notes」   → 0 条含 3.13
+# 这类「静默退化」最危险：证据闸门只会看到「读到正文但都不对题」，把整条链路
+# 判成无资料中止，而用户会觉得「全网答案这么多怎么会搜不到」。
+#
+# 因此这里做两件事：识别退化、截短重搜。截到第一个版本号为止
+# （「Python 3.13 有哪些新特性」→「Python 3.13」）恰好落回引擎能正常服务的形态。
+
+_VERSION_RE = re.compile(r'\d+(?:\.\d+)+')
+
+
+def anchor_tokens(query: str) -> list[str]:
+    """查询里最有区分度的记号。
+
+    有版本号时**只用版本号**：实体词（python）在退化结果里同样出现
+    （「Welcome to Python.org」「Python 基础教程」都含 python），拿它当判据
+    等于不判。版本号才是真正区分「答得了原题」与「答不了」的记号。
+    没有版本号时才退回较长的英文词。"""
+    versions = _VERSION_RE.findall(query or '')
+    if versions:
+        return [v.lower() for v in dict.fromkeys(versions)]
+    return [t.lower() for t in dict.fromkeys(re.findall(r'[A-Za-z]{4,}', query or ''))]
+
+
+def looks_degraded(hits: list[dict], query: str) -> bool:
+    """结果里一个区分性记号都不含 → 引擎返回的是头词的宽泛匹配。"""
+    anchors = anchor_tokens(query)
+    if not anchors:
+        return False
+    top = hits[:10]
+    if not top:
+        return True
+    for hit in top:
+        text = ' '.join(str(hit.get(k) or '') for k in ('title', 'url', 'snippet')).lower()
+        if any(a in text for a in anchors):
+            return False
+    return True
+
+
+def shortened_query(query: str) -> str | None:
+    """退化时的兜底检索词：截到第一个版本号为止。
+
+    版本号本来就在末尾时（「What's New In Python 3.13」），取版本号前最后一个
+    英文词与之拼接，得到「Python 3.13」。没有版本号则退回前两个词。
+    """
+    q = ' '.join(str(query or '').split())
+    if not q:
+        return None
+    match = _VERSION_RE.search(q)
+    if match:
+        short = q[:match.end()].strip()
+        if short.lower() == q.lower():
+            words = re.findall(r"[A-Za-z][A-Za-z0-9_.':-]*", q[:match.start()])
+            short = f'{words[-1]} {match.group(0)}' if words else ''
+    else:
+        words = q.split(' ')
+        short = ' '.join(words[:2]) if len(words) > 2 else ''
+    return short if short and short.lower() != q.lower() else None
+
+
 class AccessState(str, Enum):
     OK = "ok"
     BLOCKED = "blocked"
@@ -242,6 +309,17 @@ class ResearchService:
                     result.calls.append(call)
                     hits=(response.parsed or {}).get('results',[]) if response.ok else []
                     result.search_trace.append({'tool':'configured_search','engine':cfg.name,'query':query,'state':'succeeded' if response.ok else 'failed','result_count':len(hits),'message':response.error_message,'backend':response.meta.get('search_backend',getattr(cfg,'adapter_type',None)),'upstream':response.meta.get('unresponsive_engines',[]),'candidates':[{k:v for k,v in h.items() if k!='read'} for h in response.meta.get('candidates',hits)],'irrelevant_count':response.meta.get('irrelevant_count',0),'query_report':response.meta.get('query_report')})
+                    # 引擎把查询退化成头词的宽泛匹配时，结果里连一个版本号/实体词都没有。
+                    # 这不算「没有结果」，而是「返回了看起来相关、其实答不了原题的结果」；
+                    # 直接读下去只会让证据闸门把整条链路判成无资料。先截短重搜一次。
+                    retry=shortened_query(query)
+                    if hits and retry and looks_degraded(hits,query):
+                        rcall,rresponse=self.runtime.search(retry,limit=max_sources,content_id=result.content_id,run_mode=RunMode.REAL,prompt_version='research.agent.v1',**extra)
+                        result.calls.append(rcall)
+                        rhits=(rresponse.parsed or {}).get('results',[]) if rresponse.ok else []
+                        result.search_trace.append({'tool':'configured_search','engine':cfg.name,'query':retry,'state':'succeeded' if rresponse.ok else 'failed','result_count':len(rhits),'message':rresponse.error_message,'backend':rresponse.meta.get('search_backend',getattr(cfg,'adapter_type',None)),'upstream':rresponse.meta.get('unresponsive_engines',[]),'candidates':[{k:v for k,v in h.items() if k!='read'} for h in rresponse.meta.get('candidates',rhits)],'irrelevant_count':rresponse.meta.get('irrelevant_count',0),'query_report':rresponse.meta.get('query_report'),'retry_of':query,'retry_reason':'原查询未返回含版本号/实体词的资料，按版本号截短后重搜'})
+                        if rhits and not looks_degraded(rhits,retry):
+                            hits=rhits
             except (StateConflict,ValidationFailed):raise
             except Exception as exc:
                 result.access_failures.append({'stage':'configured_search','query':query,'message':str(exc)[:240]});continue
