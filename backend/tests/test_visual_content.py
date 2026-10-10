@@ -89,6 +89,45 @@ with tempfile.TemporaryDirectory(prefix='cwb-visual-') as tmp:
     dense_result = renderer.render_platform(dense, pf, display_id='DENSE')
     assert dense_result.passed, [(i.page_index,i.code,i.message) for i in dense_result.errors]
 
+    # Chromium 偶发崩溃（"Target page, context or browser has been closed"）是外部依赖的
+    # 瞬时故障：一次重试就能过，直接抛出去会让整条生产链路白跑。真实的版式错误必须原样抛出，
+    # 不能被重试掩盖——否则出的是有缺陷的成品。
+    def _shot(result, kw):
+        result.images.append({'page_index':1,'layout':'cover','file':'page-01.png',
+            'storage_key':'RETRY/douyin/page-01.png','sha256':'0'*64,'size_bytes':1,
+            'width':kw['width'],'height':kw['height'],'template_version':'cover@8'})
+
+    original_pages = PlaywrightRenderer._render_browser_pages
+    attempts=[]
+    def flaky(self, pages, kw, profile, result, out_dir):
+        attempts.append(1)
+        if len(attempts)==1:
+            raise RuntimeError('BrowserContext.new_page: Target page, context or browser has been closed')
+        _shot(result, kw)
+    try:
+        PlaywrightRenderer._render_browser_pages = flaky
+        retried = renderer.render_platform(draft, pf, display_id='RETRY')
+    finally:
+        PlaywrightRenderer._render_browser_pages = original_pages
+    assert len(attempts)==2 and len(retried.images)==1, (len(attempts), len(retried.images))
+
+    original_pages = PlaywrightRenderer._render_browser_pages
+    attempts=[]
+    def broken(self, pages, kw, profile, result, out_dir):
+        attempts.append(1)
+        _shot(result, kw)
+        raise ValueError('第2页 layout=checklist 却用了封面图解')
+    try:
+        PlaywrightRenderer._render_browser_pages = broken
+        raised=False
+        try:
+            renderer.render_platform(draft, pf, display_id='BROKEN')
+        except ValueError:
+            raised=True
+    finally:
+        PlaywrightRenderer._render_browser_pages = original_pages
+    assert raised and len(attempts)==1, '真实版式错误必须原样抛出且不重试'
+
 # A changed diagram must create a revision, even when the master is unchanged.
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

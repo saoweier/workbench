@@ -511,6 +511,41 @@ class PlaywrightRenderer:
         )
         out_dir.mkdir(parents=True, exist_ok=True)
 
+        # Chromium 偶发崩溃（典型报错 "Target page, context or browser has been closed"）。
+        # 那是外部依赖的瞬时故障，重试一次就能过；直接抛出去会让整条生产链路白跑，
+        # 用户看到的是「成品没出来」。只对**可识别的瞬时故障**重试，且最多一次：
+        # 真实的版式错误必须原样抛出，不能被重试掩盖。
+        for attempt in range(2):
+            images_before, issues_before = len(result.images), len(result.issues)
+            try:
+                self._render_browser_pages(pages, kw, profile, result, out_dir)
+                break
+            except Exception as exc:
+                del result.images[images_before:]
+                del result.issues[issues_before:]
+                if attempt or not self._browser_crashed(exc):
+                    raise
+
+        return result
+
+    #: Chromium 崩溃/被关闭的瞬时故障特征。命中才重试。
+    _TRANSIENT_BROWSER_ERRORS = (
+        'target page, context or browser has been closed',
+        'browser has been closed',
+        'browser closed',
+        'failed to launch browser',
+        'target closed',
+        'connection closed',
+    )
+
+    @classmethod
+    def _browser_crashed(cls, exc: BaseException) -> bool:
+        text = str(exc).lower()
+        return any(marker in text for marker in cls._TRANSIENT_BROWSER_ERRORS)
+
+    def _render_browser_pages(self, pages: list, kw: dict, profile: ProfileVersion,
+                              result: RenderResult, out_dir: Path) -> None:
+        """真正开浏览器逐页截图。抽成独立方法是为了能对 Chromium 的瞬时崩溃重试一次。"""
         from playwright.sync_api import sync_playwright
 
         with sync_playwright() as pw:
@@ -593,8 +628,6 @@ class PlaywrightRenderer:
             finally:
                 ctx.close()
                 browser.close()
-
-        return result
 
 
 def verify_images(result: RenderResult, root: Path, expected_pages: int | None = None) -> list[PageIssue]:
