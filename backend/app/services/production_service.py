@@ -298,8 +298,8 @@ class ProductionService:
                 from .content_skills import selected_topic_references
                 refs=selected_topic_references(research.sources_as_dicts(),research.search_trace)
                 prefix='热榜原链接已携带，但原站未返回可用正文。' if any(r.get('provided') and r.get('read_state')=='snippet_only' for r in refs) else ''
-                search_note=('补充搜索未配置，请在API设置中配置SearXNG。' if not self.runtime.search_provider() else '补充搜索尚未取得能回答本题的资料。')
-                exc=ValidationFailed(prefix+search_note+'详细原因和来源记录见技能诊断。',details={**exc.details,'assessment_message':str(exc)})
+                search_note=self._search_failure_note(research)
+                exc=ValidationFailed(prefix+search_note+'详细原因和来源记录见技能诊断。',details={**exc.details,'assessment_message':str(exc),'search_failure':search_note})
             self._save_sources(content_id,research)
             self.skills.record(run.id,'research',state='failed',content_id=content_id,snapshot=snapshot,
                 inputs={'topic':topic,'run_mode':run_mode.value},output={'sources':research.sources_as_dicts(),'claims':research.claims_as_dicts(),
@@ -633,6 +633,50 @@ class ProductionService:
             "notice": ("本次未执行自动搜索：未配置搜索 Provider，内容依据为已有资料"
                        if not res.search_executed else "本次已执行自动搜索"),
         }
+
+    def _search_failure_note(self, research: ResearchResult) -> str:
+        """把搜索通道的真实报错带到用户面前。
+
+        旧文案把「搜索地址配错（404）」和「搜到了但没命中」说成同一句话
+        「补充搜索尚未取得能回答本题的资料」，用户看着像前者是后者，只能反复重试。
+        这里在检索全部失败时直接报出通道名、地址和上游原始报错。
+        """
+        cfg = self.runtime.search_provider()
+        if cfg is None:
+            return '补充搜索未配置，请在API设置中配置SearXNG。'
+        traces = [t for t in (getattr(research, 'search_trace', None) or []) if t.get('tool') == 'configured_search']
+        executed = [t for t in traces if t.get('state') in {'succeeded', 'failed'}]
+        failed = [t for t in traces if t.get('state') == 'failed']
+        if executed and len(failed) == len(executed):
+            reasons = []
+            for t in failed:
+                msg = str(t.get('message') or '').strip()
+                if msg and msg not in reasons:
+                    reasons.append(msg)
+            detail = '；'.join(reasons[:3])
+            return (f'补充搜索通道「{cfg.name}」({cfg.adapter_type.value} @ {cfg.base_url}) '
+                    f'{len(failed)} 次检索全部失败' + (f'，上游报错：{detail}' if detail else '')
+                    + '。请到 API 设置核对搜索服务地址，并用「连通性校验」复测。')
+        # 检索本身跑通了：正文能读到，但读到的内容答不了原题。
+        # 旧文案一律说「尚未取得资料」，把"搜到了但不对题"讲成"没搜到"，
+        # 用户会一直去修搜索。这里改为说明实际读到了哪些站点。
+        from urllib.parse import urlsplit
+        from .evidence_gate import CONTEXT_KINDS
+        readable = [s for s in (getattr(research, 'sources_as_dicts', lambda: [])() or [])
+                    if s.get('kind') not in CONTEXT_KINDS
+                    and s.get('access_state') == 'ok'
+                    and s.get('excerpt_basis') in {'user_provided', 'full_text', 'local_file'}
+                    and len(str(s.get('excerpt') or '').strip()) >= 30]
+        if readable:
+            hosts = []
+            for s in readable:
+                host = urlsplit(str(s.get('url') or '')).hostname or str(s.get('id'))
+                if host not in hosts:
+                    hosts.append(host)
+            return (f'检索本身是通的（{len(executed) - len(failed)} 次成功），已读到 {len(readable)} 篇正文'
+                    f'（{"、".join(hosts[:4])}），但没有一篇能回答原题：检索结果与原题不符。'
+                    '这不是搜索故障——换更具体的检索口径，或改用「引导式创作」自己提供资料。')
+        return '补充搜索尚未取得能回答本题的资料。'
 
     def _reuse_revision_evidence(self, content_id: str, res: ResearchResult,
                                  run_mode: RunMode, *, base_revision_id: str | None = None) -> bool:

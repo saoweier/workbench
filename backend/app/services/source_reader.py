@@ -2,10 +2,16 @@
 from html.parser import HTMLParser
 import hashlib
 import ipaddress
+import os
 import socket
 import re
 from urllib.parse import urlsplit,urljoin
 import httpx
+
+# 单篇正文的读取时限。这里必须给够余量：真实文章页常见 200KB~2MB，
+# 走公司代理/跨境线路时首字节就要好几秒，8 秒会把「慢」误判成「读不到」。
+# 于是热榜原链接永远拿不到正文，整条选题链路被判「无资料」而中止。
+DEFAULT_READ_TIMEOUT_SECONDS = float(os.environ.get('CWB_SOURCE_READ_TIMEOUT','30'))
 
 class TextParser(HTMLParser):
     def __init__(self):
@@ -71,8 +77,9 @@ def validate_public_url(url, *, allow_localhost=False):
         if answer.get('Status')!=0 or not public or not all(a.is_global for a in public):
             raise ValueError('代理DNS未能核验公开来源地址')
 
-def read_source_detail(url, *, allow_localhost=False, blocked_domains=()):
-    with httpx.Client(timeout=8,follow_redirects=False) as client:
+def read_source_detail(url, *, allow_localhost=False, blocked_domains=(), timeout=None):
+    limit = DEFAULT_READ_TIMEOUT_SECONDS if timeout is None else float(timeout)
+    with httpx.Client(timeout=limit,follow_redirects=False) as client:
       for hop in range(4):
         validate_public_url(url,allow_localhost=allow_localhost)
         host=(urlsplit(url).hostname or '').lower()
