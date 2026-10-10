@@ -78,6 +78,22 @@ def validate_public_url(url, *, allow_localhost=False):
             raise ValueError('代理DNS未能核验公开来源地址')
 
 def read_source_detail(url, *, allow_localhost=False, blocked_domains=(), timeout=None):
+    """读取一篇文章正文。
+
+    同一路径的 http 版本经常被站点丢到验证页或直接 403，而 https 版本正常可读
+    （实测 blog.csdn.net、blog.51cto.com、zhuanlan.zhihu.com 等）。
+    因此 http 失败时自动用 https 重试一次，而不是把「读不到」直接记成来源不可用——
+    否则搜索明明返回了正确候选，最终却因大面积 snippet_only 而被判「无资料」。
+    """
+    try:
+        return _read_source_once(url,allow_localhost=allow_localhost,blocked_domains=blocked_domains,timeout=timeout)
+    except Exception:
+        if url.lower().startswith('http://'):
+            return _read_source_once('https://'+url[7:],allow_localhost=allow_localhost,blocked_domains=blocked_domains,timeout=timeout)
+        raise
+
+
+def _read_source_once(url, *, allow_localhost=False, blocked_domains=(), timeout=None):
     limit = DEFAULT_READ_TIMEOUT_SECONDS if timeout is None else float(timeout)
     with httpx.Client(timeout=limit,follow_redirects=False) as client:
       for hop in range(4):

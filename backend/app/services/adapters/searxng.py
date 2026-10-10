@@ -107,6 +107,10 @@ class SearXNGAdapter(BaseAdapter):
             # title-only lexical filter loses valid results for long English
             # queries (for example, "mathematical manuscripts" vs "math").
             kept = [hit for hit in kept if _relevance(hit['title']+' '+hit['snippet'],query)>0]
+            # 按相关性降序。读取配额有限（每轮只读少数几条就停），必须让最相关的
+            # 候选排在前面；否则刚过阈值的页面会先被读走并触发提前停止，
+            # 真正对题的候选连排队的机会都没有。
+            kept.sort(key=lambda hit:_relevance(hit['title']+' '+hit['snippet'],query),reverse=True)
         meta = {'unresponsive_engines':body.get('unresponsive_engines') or [],
                 'dropped_count':dropped,'result_count':len(kept),'search_backend':'searxng',
                 'candidates':candidates[:30],'irrelevant_count':len(candidates)-len(kept)}

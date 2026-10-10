@@ -584,7 +584,11 @@ class ContentSkills:
             'gaps':gaps or [],'existing_sources':[{'url':s.get('url'),'title':s.get('locator'),'kind':s.get('kind'),'access_state':s.get('access_state'),'excerpt':(s.get('excerpt') or '')[:1500]} for s in (sources or [])],
             'selected_topic_references':selected_topic_references(sources or [],search_trace),
             'run_mode':'real','tool_budget':policy,'available_tools':['public_search(query)','read_public_article(url)'],
-            'contract':'只输出检索计划，不冒充已搜索。搜索词由主题核心词、用户时间范围及证据目标组成，去掉AI预测、做图、活泼等制作措辞。只对时效事件补齐当前年份；技术基础、一般知识和面试题不加日期。英文资料可给英文检索词。优先权威公开文章；不得搜索密钥或私人信息。'}
+            'contract':'只输出检索计划，不冒充已搜索。搜索词由主题核心词、用户时间范围及证据目标组成，去掉AI预测、做图、活泼等制作措辞。'
+                '检索词要短：每条控制在 2~6 个词，由核心名词短语拼成，不要照抄整句标题——把「2026 年最值得关注的 10 个开源 AI 编程助手」整句交给搜索引擎，'
+                '会被分词成「2026」这种高频词，召回的是「2026 年节假日安排」这类与原题无关的结果（已实测）。'
+                '榜单、排行、盘点类题目，检索词要带「榜单」「排行」「盘点」「推荐」这类词，并至少给一条与标题措辞不同的同义说法。'
+                '只对时效事件补齐当前年份；技术基础、一般知识和面试题不加日期。英文资料可给英文检索词。优先权威公开文章；不得搜索密钥或私人信息。'}
         schema=ResearchSearchPlan.model_json_schema();schema['properties']['queries']['maxItems']=policy['queries_per_round']
         return self._model('research',inputs,ResearchSearchPlan,context_id=context_id,content_id=content_id,snapshot=snapshot,output_schema=schema)
 

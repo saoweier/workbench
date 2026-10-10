@@ -37,6 +37,15 @@ def _relevance(title,query):
     tokens=set(w for w in words if not re.fullmatch(r'\d{4}',w))
     tokens.update(w[i:i+2] for w in words if re.search(r'[\u4e00-\u9fff]',w) for i in range(len(w)-1))
     text=title.lower()
+    # 版本号是强区分信号：搜「Python 3.13」时，讲 3.3 / 3.10 的文章同样命中
+    # 「python」和「新特性」，会挤掉真正讲 3.13 的内容。这里给版本对上的加分、
+    # 对不上的降权，但**不归零**——一旦候选被全部过滤，整次搜索会被判成
+    # 「未返回可用链接」，连可用的结果也一起丢掉。候选随后按分数降序排列，
+    # 读取配额自然会先给版本对上的那几篇。
+    version_bonus=0
+    _versions=re.findall(r'\d+\.\d+',query)
+    if _versions:
+        version_bonus=8 if any(v in text for v in _versions) else -4
     def matches(token):
         return bool(re.search(r'(?<![a-z])'+re.escape(token)+r'(?![a-z])',text)) if token.isascii() and token.isalpha() else token in text
     matched={t for t in tokens if matches(t)}
@@ -48,7 +57,14 @@ def _relevance(title,query):
     if len(english)>=3 and not chinese and len(matched&english)<(len(english)+1)//2:return 0
     subject=sum(len(t) for t in matched)
     if not subject:return 0
-    return subject+sum(12 for year in re.findall(r'\b\d{4}\b',query) if year in text)
+    # 命中多个不同的词才说明对题：只蹭到一个通用词（如「助手」）不算相关。
+    # 缺这项时「2026年节日大全一览表-百历助手」会仅凭「助手」+年份压过
+    # 真正对题的「11款最佳AI编程写代码助手评测推荐_知乎」。
+    subject+=4*max(0,len(matched)-1)
+    # 年份只是弱信号。原先给 12 分，导致「2026 年节日大全一览表」这类仅靠标题里
+    # 含「2026」命中的页面拿到高分、通过相关性过滤，再挤掉真正对题的候选。
+    # 降到 3 分：同类year资料仍排在无年份之前，但年份单独挑不过主题词。
+    return max(1,subject+sum(3 for year in re.findall(r'\b\d{4}\b',query) if year in text)+version_bonus)
 
 def search_public(*args, **kwargs):
     """Retired compatibility entry point; no search-engine network requests."""
